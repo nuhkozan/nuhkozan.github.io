@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mindgap.app",
+      "sha256_cert_fingerprints": [
+        "79:6A:9B:49:23:77:B5:9B:5B:BF:1A:C3:CD:CD:5A:6E:F9:80:C4:EB:E3:31:8D:DA:62:98:64:74:22:6F:98:62"
+      ]
+    }
+  }
+]
