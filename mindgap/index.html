@@ -1,0 +1,3545 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MIND GAP</title>
+
+<!-- PWA / APK için gerekli meta etiketleri -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#060a10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MIND GAP">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="description" content="255 seviyelik blok bulmaca oyunu — IQ'nu test et, sıralamada yüksel.">
+
+<style>
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#070710;
+  color:#e0f0ff;font-family:'Trebuchet MS',sans-serif;touch-action:none}
+body{display:flex;flex-direction:column;align-items:center;height:100dvh;
+  padding:calc(env(safe-area-inset-top,0px) + clamp(6px,2vh,14px)) 4px 3px;gap:7px}
+
+.topbar{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px;width:100%;row-gap:6px}
+#iqBadge{font-size:clamp(.62rem,2.7vw,.85rem);font-weight:700;color:#00e8ff;
+  letter-spacing:.02em;text-shadow:0 0 10px #00e8ff;
+  background:rgba(0,220,255,.08);border:1px solid rgba(0,220,255,.35);
+  border-radius:999px;padding:4px 8px;white-space:nowrap}
+#scoreBadge{font-size:clamp(.62rem,2.7vw,.85rem);font-weight:700;color:#ffd040;
+  letter-spacing:.02em;text-shadow:0 0 10px rgba(255,200,60,.7);
+  background:rgba(255,200,60,.08);border:1px solid rgba(255,200,60,.35);
+  border-radius:999px;padding:4px 8px;white-space:nowrap}
+#lvlBadge{font-size:clamp(.6rem,2.5vw,.8rem);font-weight:700;color:#ffd040;
+  text-shadow:0 0 8px rgba(255,200,60,.7);background:rgba(255,200,60,.08);
+  border:1px solid rgba(255,200,60,.3);border-radius:999px;padding:4px 8px;white-space:nowrap}
+#offlineBadge{font-size:clamp(.8rem,3.2vw,.95rem);color:#ff8a4a;
+  background:rgba(255,120,50,.1);border:1px solid rgba(255,120,50,.4);
+  border-radius:999px;padding:4px 12px;animation:offlinePulse 2s ease-in-out infinite}
+@keyframes offlinePulse{0%,100%{opacity:.7}50%{opacity:1}}
+.sub{margin:0;padding:2px 0;font-size:clamp(.78rem,3.2vw,.95rem);color:#d0ecff;font-weight:700;text-align:center;
+  flex-shrink:0;text-shadow:0 1px 3px rgba(0,0,0,.5),0 0 10px rgba(0,180,255,.15);letter-spacing:.01em;
+  display:flex;align-items:center;justify-content:center;min-height:1.6em}
+
+/* BOARD */
+#bwrap{position:relative;flex-shrink:0;margin-top:3px;margin-bottom:7px}
+#bwrap::after{content:'';position:absolute;inset:-5px;border-radius:14px;pointer-events:none;
+  box-shadow:0 0 0 2px #00e8ff,0 0 18px 5px #00e8ff,0 0 50px 12px rgba(0,180,255,.45);
+  animation:np 2.6s ease-in-out infinite;z-index:0}
+@keyframes np{
+  0%,100%{box-shadow:0 0 0 2px #00e8ff,0 0 18px 5px #00e8ff,0 0 50px 12px rgba(0,180,255,.45)}
+  50%{box-shadow:0 0 0 2px #00ffcc,0 0 26px 8px #00ffcc,0 0 70px 18px rgba(0,255,180,.5)}}
+#board{position:relative;background:#f7f3eb;border-radius:8px;overflow:hidden;z-index:1}
+
+#status{flex-shrink:0;text-align:center;font-size:clamp(.7rem,2.6vw,.88rem);
+  font-weight:800;min-height:1em;color:#00ffcc;text-shadow:0 0 10px #00ffcc;
+  letter-spacing:.02em}
+#status:not(:empty){background:rgba(0,255,200,.08);border:1px solid rgba(0,255,200,.28);
+  border-radius:999px;padding:3px 14px;display:inline-block}
+
+/* DEMO MODU */
+#demoSkipWrap{flex-shrink:0;display:none;justify-content:center;padding:2px 0}
+#demoSkipWrap.show{display:flex}
+#demoSkipBtn{font-family:inherit;font-size:clamp(.62rem,2.2vw,.76rem);padding:5px 14px;
+  border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(255,255,255,.06);
+  color:#c0c8d0;cursor:pointer;font-weight:600}
+#demoSkipBtn:hover{background:rgba(255,255,255,.14)}
+#demoCursor{position:fixed;z-index:10002;font-size:clamp(1.6rem,7vw,2.2rem);
+  pointer-events:none;display:none;filter:drop-shadow(0 3px 8px rgba(0,0,0,.7));
+  transform:translate(-25%,-15%)}
+#demoCursor.show{display:block}
+#demoBanner{position:fixed;left:50%;top:12%;transform:translateX(-50%);
+  background:rgba(0,20,35,.94);border:1px solid #00e8ff;color:#00e8ff;
+  padding:10px 22px;border-radius:12px;font-size:clamp(.72rem,3vw,.9rem);
+  font-weight:700;z-index:10002;display:none;text-align:center;max-width:88vw;
+  box-shadow:0 0 20px rgba(0,200,255,.3)}
+#demoBanner.show{display:block}
+
+/* TRAY */
+#tray{flex:1 1 auto;min-height:0;width:100%;display:grid;margin-top:-16px;
+  align-items:center;justify-items:center;align-content:start;justify-content:center;
+  overflow:hidden;position:relative}
+.pbox{position:relative;border:1.5px solid rgba(0,220,255,.22);border-radius:8px;
+  background:rgba(0,180,255,.05);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:border-color .15s;flex-shrink:0}
+.pbox:hover{border-color:rgba(0,220,255,.55)}
+.pbox.placed{opacity:.32;cursor:default}
+.pbox.placed::after{content:'✓';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);font-size:1.3em;color:#00ffcc;
+  text-shadow:0 0 8px #00ffcc;pointer-events:none}
+.pbox canvas{display:block;pointer-events:none}
+.pbox.guideTarget{border-color:#ffd040;border-width:2.5px;
+  animation:guidePulse 1.1s ease-in-out infinite}
+@keyframes guidePulse{
+  0%,100%{box-shadow:0 0 6px 1px rgba(255,200,60,.5)}
+  50%{box-shadow:0 0 16px 5px rgba(255,200,60,.85)}
+}
+
+footer{flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:4px 0;
+  transform:translateY(-8px)}
+button{font-family:inherit;font-size:clamp(.85rem,3.6vw,1.05rem);padding:10px 18px;
+  border:1px solid rgba(0,220,255,.25);border-radius:999px;
+  background:rgba(0,180,255,.07);color:#b0ddf0;cursor:pointer;font-weight:700;
+  transition:background .15s,transform .1s}
+button:hover{background:rgba(0,220,255,.18);border-color:#00e8ff}
+button:active{transform:scale(.95)}
+button.primary{background:linear-gradient(135deg,#00c8ff,#0055b0);
+  color:#fff;border-color:#00e8ff;box-shadow:0 0 10px rgba(0,200,255,.45)}
+button:disabled{opacity:.35;cursor:default}
+#adCountdownBadge{display:none;align-items:center;justify-content:center;
+  font-size:clamp(.8rem,3.2vw,.98rem);font-weight:800;color:#ffd040;
+  background:rgba(255,200,60,.12);border:1px solid rgba(255,200,60,.4);
+  border-radius:999px;padding:8px 14px;text-shadow:0 0 8px rgba(255,200,60,.6);
+  margin-left:2px}
+#homeBtn{font-size:clamp(1.15rem,4.8vw,1.4rem);font-weight:800;
+  padding:9px 16px;min-width:2.4em;line-height:1}
+#prevBtn,#nextBtn{font-size:clamp(.78rem,3.3vw,.95rem);font-weight:800;
+  padding:9px 16px;display:inline-flex;align-items:center;gap:5px;line-height:1}
+
+#dlayer{position:fixed;inset:0;pointer-events:none;z-index:9999}
+
+/* Toast (döndürme bildirimi) */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18%;
+  background:rgba(0,20,35,.92);border:1px solid #00e8ff;color:#00e8ff;
+  padding:8px 18px;border-radius:999px;font-size:clamp(.7rem,2.8vw,.85rem);
+  font-weight:700;z-index:10001;opacity:0;pointer-events:none;
+  transition:opacity .25s;text-shadow:0 0 8px rgba(0,232,255,.6);
+  box-shadow:0 0 16px rgba(0,200,255,.35)}
+#toast.show{opacity:1}
+
+/* Tutorial el işareti */
+#tutHand{position:fixed;z-index:10002;font-size:clamp(1.6rem,7vw,2.4rem);
+  pointer-events:none;display:none;filter:drop-shadow(0 2px 8px rgba(0,0,0,.7));
+  transform:translate(-30%,-20%)}
+#tutHand.show{display:block}
+#tutHand.pokeAnim{animation:handPoke .9s ease-in-out infinite}
+#tutHand.blinkAnim{animation:handBlink .8s ease-in-out infinite}
+@keyframes handPoke{
+  0%,100%{transform:translate(-30%,-20%) scale(1) translateY(0)}
+  50%{transform:translate(-30%,-20%) scale(.82) translateY(12px)}
+}
+@keyframes handBlink{
+  0%,100%{opacity:1}
+  50%{opacity:.15}
+}
+#level1GuideOutline{position:fixed;top:0;left:0;pointer-events:none;z-index:9998}
+.guideCell{position:absolute;border:2.5px dashed #00ffcc;border-radius:6px;
+  box-shadow:0 0 10px rgba(0,255,200,.55);animation:guideCellPulse 1.1s ease-in-out infinite}
+@keyframes guideCellPulse{0%,100%{opacity:.5}50%{opacity:1}}
+#tutMsg{position:fixed;left:50%;transform:translateX(-50%);top:14%;
+  background:rgba(0,20,35,.94);border:1px solid #ffd040;color:#ffd040;
+  padding:10px 20px;border-radius:12px;font-size:clamp(.72rem,3vw,.9rem);
+  font-weight:700;z-index:10002;display:none;text-align:center;
+  box-shadow:0 0 20px rgba(255,200,60,.3);max-width:86vw;pointer-events:none}
+#tutMsg.show{display:block}
+
+/* Sahte reklam */
+#adOverlay{position:fixed;inset:0;background:#000;z-index:10005;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#adOverlay.show{display:flex}
+.adBox{width:min(86vw,340px);aspect-ratio:4/5;border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  background:linear-gradient(160deg,#ff6b35,#e8336d 55%,#7b2ff7);
+  box-shadow:0 0 40px rgba(255,80,120,.4);position:relative;overflow:hidden}
+.adBox h3{margin:0;font-size:clamp(1.1rem,5vw,1.5rem);color:#fff;text-align:center;
+  text-shadow:0 2px 8px rgba(0,0,0,.4);padding:0 12px}
+.adBox p{margin:0;color:rgba(255,255,255,.9);font-size:clamp(.7rem,3vw,.85rem);
+  text-align:center;padding:0 16px}
+.adBox .adEmoji{font-size:clamp(2.5rem,12vw,4rem);animation:bounce 1s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+.adTag{position:absolute;top:8px;left:10px;background:rgba(0,0,0,.5);
+  color:#fff;font-size:.62rem;padding:2px 8px;border-radius:4px}
+#adTimer{color:#fff;font-size:clamp(.8rem,3.4vw,1rem);font-weight:700}
+#adCloseBtn{display:none}
+#adCloseBtn.show{display:inline-block}
+
+/* ANA MENÜ */
+#mainMenu{position:fixed;inset:0;z-index:10008;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:radial-gradient(ellipse at 50% 25%,#0c1830 0%,#070710 70%)}
+#mainMenu.show{display:flex}
+#mainMenu .logo{font-size:clamp(1.6rem,8vw,2.6rem);font-weight:800;color:#00e8ff;
+  letter-spacing:.08em;text-shadow:0 0 20px #00e8ff,0 0 60px #00aaff;margin-bottom:4px}
+#mainMenu .logoSub{font-size:clamp(.95rem,4.2vw,1.15rem);color:#7fc8e8;font-weight:600;margin-bottom:18px}
+.menuBtn{width:min(78vw,300px);padding:14px 20px;font-size:clamp(.9rem,4vw,1.1rem);
+  font-weight:700;border-radius:14px;border:1px solid rgba(0,220,255,.3);
+  background:rgba(0,180,255,.08);color:#c8e8f8;cursor:pointer;
+  display:flex;align-items:center;gap:12px;justify-content:flex-start;
+  transition:background .15s,transform .1s,border-color .15s;font-family:inherit}
+.menuBtn .menuIcon{display:inline-flex;align-items:center;justify-content:center;
+  width:1.6em;flex-shrink:0}
+.menuBtn>span:last-child{flex:1;text-align:center}
+.menuBtn:hover{background:rgba(0,220,255,.18);border-color:#00e8ff}
+.menuBtn:active{transform:scale(.97)}
+.menuBtn.play{background:linear-gradient(135deg,#00c8ff,#0055b0);color:#fff;
+  border-color:#00e8ff;box-shadow:0 0 18px rgba(0,200,255,.5)}
+#menuUserRow{color:#ffd040;font-weight:700;font-size:clamp(.85rem,3.6vw,1.02rem);margin-bottom:8px;
+  text-align:center;text-shadow:0 0 8px rgba(255,200,60,.5);line-height:1.5;padding:0 6px}
+#menuUserRow .menuUserStats{display:inline-block;margin-top:2px;font-size:.86em;font-weight:600;opacity:.92}
+#streakRow{font-size:clamp(.7rem,2.8vw,.85rem);color:#ff9a3c;font-weight:700;
+  margin-bottom:6px;display:none;align-items:center;gap:5px}
+#streakRow.show{display:flex}
+#menuToggleRow{display:flex;gap:10px;margin-top:6px}
+.toggleBtn{width:52px;height:44px;border-radius:12px;border:1px solid rgba(0,220,255,.3);
+  background:rgba(0,180,255,.08);color:#c8e8f8;font-size:1.2rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}
+.toggleBtn:hover{background:rgba(0,220,255,.18)}
+.toggleBtn:active{transform:scale(.94)}
+.langRow{display:flex;gap:10px}
+#langSel{cursor:pointer;background:#0c1420;color:#c8e8f8;font-size:clamp(.85rem,3.6vw,1rem)}
+#langSel option{background:#0c1420;color:#c8e8f8}
+.langRow button{width:auto;padding:10px 22px}
+.langRow button.active{border-color:#ffd040;color:#ffd040;background:rgba(255,200,60,.12)}
+#rulesBody{color:#b8d4e4;font-size:clamp(.72rem,3vw,.86rem);line-height:1.55;
+  max-height:50vh;overflow-y:auto}
+#rulesBody b{color:#00e8ff}
+
+
+/* Kullanıcı adı & liderlik */
+.modal{position:fixed;inset:0;background:rgba(0,8,16,.92);z-index:10010;
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px}
+.modal.show{display:flex}
+.modal .card{background:#0c1420;border:1px solid rgba(0,220,255,.3);border-radius:16px;
+  padding:22px 20px;width:min(88vw,360px);display:flex;flex-direction:column;gap:16px;
+  box-shadow:0 0 30px rgba(0,200,255,.2)}
+.modal h2{margin:0;font-size:clamp(1.2rem,5.5vw,1.6rem);color:#00e8ff;text-align:center;
+  text-shadow:0 0 12px rgba(0,232,255,.6)}
+.modal input{font-family:inherit;font-size:clamp(1.05rem,4.5vw,1.25rem);padding:14px 16px;border-radius:10px;
+  border:1px solid rgba(0,220,255,.35);background:#081018;color:#e0f0ff;outline:none;text-align:center;font-weight:600}
+.modal input:focus{border-color:#00e8ff;box-shadow:0 0 10px rgba(0,220,255,.3)}
+.modal button.primary{font-size:clamp(1.05rem,4.8vw,1.3rem);font-weight:800;padding:14px 20px;
+  letter-spacing:.02em}
+.langPickBtn{display:block;width:100%;margin:8px 0;font-size:clamp(1rem,4.4vw,1.2rem);
+  font-weight:800;padding:16px 18px;text-align:center;
+  background:linear-gradient(135deg,#00c8ff,#0055b0);color:#fff;
+  border:1px solid #00e8ff;box-shadow:0 0 10px rgba(0,200,255,.4)}
+.langPickBtn:hover{background:linear-gradient(135deg,#1ad4ff,#0066cc)}
+
+/* BÖLÜM HARİTASI */
+.mapCard{width:min(92vw,420px);max-height:82vh}
+#mapStageTabs{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;flex-shrink:0}
+.mapStageTab{flex-shrink:0;padding:6px 12px;border-radius:999px;font-size:.72rem;font-weight:700;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#8090a0;
+  cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.mapStageTab.active{background:rgba(0,220,255,.18);border-color:#00e8ff;color:#00e8ff}
+#mapGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;overflow-y:auto;
+  padding:4px 2px;flex:1;min-height:200px;max-height:52vh}
+.mapCell{aspect-ratio:1;border-radius:9px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;font-size:.72rem;font-weight:800;cursor:pointer;position:relative;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#4a5a68;
+  transition:transform .1s}
+.mapCell:active{transform:scale(.92)}
+.mapCell.done{background:rgba(62,224,138,.14);border-color:rgba(62,224,138,.5);color:#3ee08a}
+.mapCell.current{background:rgba(0,220,255,.2);border-color:#00e8ff;color:#00e8ff;
+  box-shadow:0 0 12px rgba(0,220,255,.5);animation:mapPulse 1.4s ease-in-out infinite}
+.mapCell.locked{background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.06);
+  color:#33404c;cursor:default}
+.mapCell .mapCheck{position:absolute;top:2px;right:3px;font-size:.55rem}
+@keyframes mapPulse{0%,100%{box-shadow:0 0 8px rgba(0,220,255,.4)}50%{box-shadow:0 0 16px rgba(0,220,255,.7)}}
+.modal .err{color:#ff5060;font-size:clamp(.82rem,3.2vw,.95rem);font-weight:600;text-align:center;min-height:1em;margin:0}
+.modal .err.offlineErr{color:#ffa040;font-weight:700}
+#lbList{max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.lbMyRankNote{text-align:center;color:#00e8ff;font-size:clamp(.85rem,3.6vw,1.02rem);
+  font-weight:900;letter-spacing:.01em;padding:6px 10px 10px;
+  text-shadow:0 0 12px rgba(0,220,255,.55);border-bottom:1px solid rgba(0,220,255,.2);
+  margin-bottom:2px}
+.lbRow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:9px;
+  background:rgba(0,180,255,.06);border:1px solid rgba(0,220,255,.12);font-size:clamp(.7rem,2.8vw,.85rem)}
+.lbRow.me{border-color:#ffd040;background:rgba(255,200,60,.1)}
+.lbRow .rank{font-weight:800;color:#00e8ff;min-width:2em}
+.lbRow .name{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbRow .title{color:#ffd040;font-size:.85em}
+.lbRow .score{font-weight:800;color:#00ffcc}
+#userTag{display:inline-flex;align-items:center;gap:4px;font-size:clamp(.62rem,2.6vw,.82rem);
+  color:#ffe27a;text-align:center;flex-shrink:1;font-weight:800;
+  letter-spacing:.01em;background:linear-gradient(135deg,rgba(255,200,60,.16),rgba(255,140,0,.10));
+  border:1px solid rgba(255,200,60,.55);border-radius:999px;padding:4px 10px;
+  text-shadow:0 0 10px rgba(255,200,60,.8);box-shadow:0 0 14px rgba(255,180,40,.25);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42vw}
+
+
+
+/* Kazanma overlay */
+#winOverlay{position:fixed;inset:0;background:rgba(0,10,20,.82);z-index:10000;
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+#winOverlay.show{display:flex}
+#winOverlay h2{margin:0;font-size:clamp(1.2rem,6vw,2rem);color:#00ffcc;
+  text-shadow:0 0 20px #00ffcc,0 0 50px #00ffaa}
+#winOverlay button{font-size:clamp(.8rem,3.4vw,1rem);padding:10px 28px}
+
+/* SIRALAMA RULETİ — bölüm sonu skor/sıra geçiş animasyonu */
+#rankShiftPanel{display:none;flex-direction:column;align-items:center;gap:8px;
+  width:min(92vw,360px)}
+#rankShiftPanel.show{display:flex}
+#rankShiftLabel{font-size:clamp(.68rem,2.6vw,.8rem);font-weight:700;color:#8090a0;
+  letter-spacing:.04em;text-transform:uppercase}
+#rankShiftTrack{position:relative;width:100%;height:168px;border-radius:14px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+  overflow:hidden}
+#rankShiftTrack::before,#rankShiftTrack::after{content:'';position:absolute;left:0;right:0;
+  height:36px;pointer-events:none;z-index:3}
+#rankShiftTrack::before{top:0;background:linear-gradient(rgba(10,16,24,.95),transparent)}
+#rankShiftTrack::after{bottom:0;background:linear-gradient(transparent,rgba(10,16,24,.95))}
+.rsRow{position:absolute;left:6px;right:6px;height:34px;border-radius:9px;
+  display:flex;align-items:center;gap:8px;padding:0 10px;
+  background:rgba(255,255,255,.045);font-size:clamp(.66rem,2.6vw,.78rem);
+  transition:top .6s cubic-bezier(.22,.9,.28,1), background .3s, box-shadow .3s;
+  will-change:top}
+.rsRow .rsRank{width:24px;flex-shrink:0;text-align:center;font-weight:800;color:#8090a0}
+.rsRow .rsName{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c8d0d8}
+.rsRow .rsScore{flex-shrink:0;font-weight:800;color:#ffd040}
+.rsRow.me{background:rgba(0,232,255,.13);border:1px solid rgba(0,232,255,.5);
+  box-shadow:0 0 16px rgba(0,200,255,.35);z-index:2}
+.rsRow.me .rsRank{color:#00e8ff}
+.rsRow.me .rsName{color:#fff;font-weight:700}
+#rankShiftDelta{font-size:clamp(.72rem,3vw,.88rem);font-weight:800;min-height:1.3em;
+  display:flex;align-items:center;gap:6px}
+#rankShiftDelta.up{color:#3ee08a;text-shadow:0 0 10px rgba(62,224,138,.6)}
+#rankShiftDelta.down{color:#ff6a6a}
+#rankShiftDelta.same{color:#8090a0}
+
+/* Ünvan atlama ödül rozeti */
+#titleUpBadge{display:none;position:relative;flex-direction:column;align-items:center;gap:2px;
+  padding:18px 30px;border-radius:18px;
+  background:linear-gradient(160deg,rgba(255,200,60,.14),rgba(255,150,20,.06));
+  border:1.5px solid rgba(255,200,60,.55);
+  box-shadow:0 0 30px rgba(255,180,40,.35),inset 0 0 20px rgba(255,200,60,.08);
+  animation:titlePop .5s cubic-bezier(.34,1.56,.64,1)}
+#titleUpBadge.show{display:flex}
+#titleUpBadge:not(.titleChanged){
+  background:linear-gradient(160deg,rgba(120,180,255,.10),rgba(80,140,255,.04));
+  border:1.5px solid rgba(120,180,255,.4);
+  box-shadow:0 0 20px rgba(100,160,255,.22),inset 0 0 14px rgba(120,180,255,.06)}
+#titleUpBadge:not(.titleChanged) .titleUpGlow{display:none}
+#titleUpBadge:not(.titleChanged) .titleUpLabel{color:#8fc0ff}
+#titleUpBadge:not(.titleChanged) .titleUpName{color:#bcd8ff;text-shadow:0 0 10px rgba(120,180,255,.5)}
+#titleUpBadge:not(.titleChanged) .titleUpReward{color:#d8e8ff}
+@keyframes titlePop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+.titleUpGlow{position:absolute;inset:-2px;border-radius:18px;pointer-events:none;
+  box-shadow:0 0 40px 6px rgba(255,200,60,.4);animation:titleGlow 1.6s ease-in-out infinite}
+@keyframes titleGlow{0%,100%{opacity:.5}50%{opacity:1}}
+.titleUpIcon{font-size:clamp(2rem,9vw,3rem);animation:titleSpin 1.2s ease-out}
+@keyframes titleSpin{0%{transform:rotate(-25deg) scale(.5);opacity:0}100%{transform:rotate(0) scale(1);opacity:1}}
+.titleUpLabel{font-size:clamp(.65rem,2.6vw,.8rem);color:#ffcc66;text-transform:uppercase;
+  letter-spacing:.08em;font-weight:700;margin-top:2px}
+.titleUpName{font-size:clamp(1.1rem,5vw,1.5rem);font-weight:800;color:#ffd040;
+  text-shadow:0 0 14px rgba(255,200,60,.8);margin:2px 0}
+.titleUpReward{font-size:clamp(.75rem,3vw,.92rem);color:#fff2cc;font-weight:700}
+</style>
+<!-- Firebase (Firestore) — merkezi kullanıcı adı / skor / liderlik verisi için -->
+<!-- Firebase Analytics — günlük aktif kullanıcı / yeni kullanıcı / oturum istatistikleri için -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBMcuXyZBDCuZ8ZiqKsheh41LqUyWDU5b8",
+  authDomain: "mindgap-c51b7.firebaseapp.com",
+  databaseURL: "https://mindgap-c51b7-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "mindgap-c51b7",
+  storageBucket: "mindgap-c51b7.firebasestorage.app",
+  messagingSenderId: "712682738039",
+  appId: "1:712682738039:web:0ea244284184c36ebc5172",
+  measurementId: "G-H0QKEZ8WZ1"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Analytics başlatma HER ZAMAN try/catch içinde — bazı WebView/ağ
+// koşullarında (ör. ölçüm isteği engellenmişse) analytics.() çağrısı
+// hata verebilir; bu durum oyunun geri kalanını ASLA etkilememeli.
+let ANALYTICS=null;
+try{ ANALYTICS=firebase.analytics(); }catch(e){ console.error('Analytics başlatılamadı:',e); }
+
+// Tüm özel olay kayıtları bu fonksiyon üzerinden geçer — Analytics
+// kullanılamıyorsa (ANALYTICS=null) sessizce hiçbir şey yapmaz, oyunun
+// akışını asla bloklamaz veya hataya düşürmez.
+function logAnalyticsEvent(name, params){
+  if(!ANALYTICS) return;
+  try{ ANALYTICS.logEvent(name, params||{}); }catch(e){}
+}
+</script>
+</head>
+<body>
+
+<div class="topbar">
+  <span id="userTag"></span>
+  <span id="iqBadge">🧠 IQ: 80</span>
+  <span id="scoreBadge">⭐ 0</span>
+  <span id="lvlBadge">Bölüm 1</span>
+  <span id="offlineBadge" style="display:none">📡</span>
+</div>
+
+<div id="bwrap"><div id="board">
+  <canvas id="gc"></canvas>
+  <canvas id="pc" style="position:absolute;left:0;top:0"></canvas>
+</div></div>
+<p class="sub" id="subTxt">Hedef: <b>1</b> numaralı kare boş kalsın &nbsp;|&nbsp; Dokun → döndür &nbsp;|&nbsp; Sürükle → yerleştir</p>
+
+<div id="status"></div>
+<div id="tray"></div>
+
+<div id="demoSkipWrap">
+  <button id="demoSkipBtn">⏭ <span id="demoSkipTxt">Skip Tutorial</span></button>
+</div>
+
+<footer>
+  <button id="homeBtn">🏠</button>
+  <button id="prevBtn">◀ <span id="prevBtnTxt">Önceki</span></button>
+  <button id="nextBtn"><span id="nextBtnTxt">Sonraki</span> ▶</button>
+  <button id="hintBtn">💡 İpucu</button>
+  <button id="resetBtn">↺ Sıfırla</button>
+  <button id="solveBtn" class="primary">📺 Reklam izle &amp; İpucu kazan</button>
+  <span id="adCountdownBadge" style="display:none"></span>
+
+</footer>
+
+<canvas id="dlayer"></canvas>
+<div id="demoCursor">👆</div>
+<div id="demoBanner"></div>
+
+
+<div id="toast"></div>
+<div id="tutHand">👆</div>
+<div id="tutMsg"></div>
+<div id="level1GuideOutline"></div>
+
+<div id="adOverlay">
+  <div class="adBox" id="adBox">
+    <span class="adTag">Reklam</span>
+    <div class="adEmoji" id="adEmoji">🎮</div>
+    <h3 id="adTitle">Süper Blok Macerası!</h3>
+    <p id="adDesc">Milyonlarca oyuncuya katıl, en yüksek skoru sen yap!</p>
+  </div>
+  <div id="adTimer">Reklam: 5 sn...</div>
+  <button id="adCloseBtn" class="primary">✕ Reklamı Kapat ve İpucu Al</button>
+</div>
+
+
+
+<div id="mainMenu" class="show">
+  <div class="logo">🧠 MIND GAP</div>
+  <div class="logoSub" id="mmSub">Brain Blocks • 255 Levels</div>
+  <div id="streakRow"></div>
+  <div id="menuUserRow"></div>
+  <button class="menuBtn play" id="mmContinue"><span class="menuIcon">▶️</span> <span id="mmContinueTxt">Continue</span></button>
+  <button class="menuBtn" id="mmNewGame"><span class="menuIcon">🆕</span> <span id="mmNewGameTxt">New Game</span></button>
+  <button class="menuBtn" id="mmNewUser"><span class="menuIcon">👤</span> <span id="mmNewUserTxt">New Username</span></button>
+  <button class="menuBtn" id="mmChamp"><span class="menuIcon">🏆</span> <span id="mmChampTxt">Champions League</span></button>
+  <button class="menuBtn" id="mmLevelMap"><span class="menuIcon">🗺️</span> <span id="mmLevelMapTxt">Level Map</span></button>
+  <button class="menuBtn" id="mmRules"><span class="menuIcon">📜</span> <span id="mmRulesTxt">How to Play</span></button>
+  <button class="menuBtn" id="mmPrivacy" style="display:none"><span class="menuIcon">🔒</span> <span id="mmPrivacyTxt">Privacy Options</span></button>
+  <select id="langSel" class="menuBtn" style="text-align:center;appearance:auto;width:min(78vw,300px)">
+    <option value="en">🇬🇧 English</option>
+    <option value="tr">🇹🇷 Türkçe</option>
+    <option value="es">🇪🇸 Español</option>
+    <option value="ar">🇸🇦 العربية</option>
+    <option value="ru">🇷🇺 Русский</option>
+  </select>
+  <div id="menuToggleRow">
+    <button id="soundToggleBtn" class="toggleBtn">🔊</button>
+    <button id="hapticToggleBtn" class="toggleBtn">📳</button>
+  </div>
+</div>
+
+<div class="modal" id="rulesModal">
+  <div class="card">
+    <h2 id="rulesTitle">📜 Oyun Kuralları</h2>
+    <div id="rulesBody"></div>
+    <button id="rulesCloseBtn">✕</button>
+  </div>
+</div>
+
+<div class="modal" id="langPickModal">
+  <div class="card">
+    <button class="langPickBtn" data-lang="tr">🇹🇷 Türkçe</button>
+    <button class="langPickBtn" data-lang="en">🇬🇧 English</button>
+    <button class="langPickBtn" data-lang="es">🇪🇸 Español</button>
+    <button class="langPickBtn" data-lang="ar">🇸🇦 العربية</button>
+    <button class="langPickBtn" data-lang="ru">🇷🇺 Русский</button>
+  </div>
+</div>
+
+<div class="modal" id="nameModal">
+  <div class="card">
+    <h2 id="nameModalTitle">👤 Kullanıcı Adı Belirle</h2>
+    <input id="nameInput" maxlength="16" placeholder="ör: ZekaKralı42" autocomplete="off">
+    <p class="err" id="nameErr"></p>
+    <button id="nameOkBtn" class="primary">Başla ▶</button>
+    <button id="nameBackBtn">◀ Geri</button>
+  </div>
+</div>
+
+<div class="modal" id="lbModal">
+  <div class="card">
+    <h2>🏆 Global Sıralama</h2>
+    <div id="lbList"><p style="text-align:center;color:#607080">Yükleniyor...</p></div>
+    <button id="lbCloseBtn">✕ Kapat</button>
+  </div>
+</div>
+
+<div class="modal" id="mapModal">
+  <div class="card mapCard">
+    <h2 id="mapTitle">🗺️ Bölüm Haritası</h2>
+    <div id="mapStageTabs"></div>
+    <div id="mapGrid"></div>
+    <button id="mapCloseBtn">✕ Kapat</button>
+  </div>
+</div>
+
+<div id="winOverlay">
+  <h2>🎉 Bölüm Tamamlandı!</h2>
+  <p id="iqGain" style="margin:0;font-size:clamp(.9rem,4vw,1.15rem);color:#ffd040;
+    font-weight:700;text-shadow:0 0 12px rgba(255,200,60,.7)">🧠 IQ +1</p>
+  <div id="titleUpBadge">
+    <div class="titleUpGlow"></div>
+    <div class="titleUpIcon">🎖️</div>
+    <div class="titleUpLabel" id="titleUpLabelTxt">New Title Unlocked!</div>
+    <div class="titleUpName" id="titleUpName">—</div>
+    <div class="titleUpReward" id="titleUpReward">⭐ +50   💡 +1 Hint</div>
+  </div>
+  <div id="rankShiftPanel">
+    <div id="rankShiftLabel">🏆 Champions League</div>
+    <div id="rankShiftTrack"></div>
+    <div id="rankShiftDelta"></div>
+  </div>
+  <button id="shareResultBtn">📤 Paylaş</button>
+  <button id="nextLvlBtn" class="primary">Sonraki Bölüm →</button>
+</div>
+
+<div class="modal" id="rateModal">
+  <div class="card">
+    <h2 id="rateModalTitleTxt">⭐ Mind Gap'i beğendin mi?</h2>
+    <p id="rateModalMsgTxt" style="color:#b0ddf0;font-size:.9rem">Play Store'da bir puan bırakarak destek olabilirsin!</p>
+    <button id="rateNowBtn" class="primary">⭐ Değerlendir</button>
+    <button id="rateLaterBtn">Daha Sonra</button>
+    <button id="rateNeverBtn" style="opacity:.6;font-size:.78rem">Bir Daha Sorma</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// SES MOTORU — dosyasız, Web Audio API ile üretilen kısa efektler
+// ═══════════════════════════════════════════════════════
+let audioCtx=null;
+let SOUND_ON = (localStorage_get('pz_sound')!=='0');
+let HAPTIC_ON = (localStorage_get('pz_haptic')!=='0');
+
+function ensureAudioCtx(){
+  if(!audioCtx){
+    try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  }
+  if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume().catch(()=>{}); }
+  return audioCtx;
+}
+// İlk kullanıcı etkileşiminde ses bağlamını aç (tarayıcı otoplay kısıtlaması için)
+['pointerdown','touchstart','click'].forEach(evt=>{
+  window.addEventListener(evt, ()=>ensureAudioCtx(), {once:true, passive:true});
+});
+
+function playTone(freq, dur, type, vol, delay){
+  if(!SOUND_ON) return;
+  const ctx=ensureAudioCtx();
+  if(!ctx) return;
+  const t0=ctx.currentTime+(delay||0);
+  const osc=ctx.createOscillator();
+  const gain=ctx.createGain();
+  osc.type=type||'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol||0.12, t0+0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(t0); osc.stop(t0+dur+0.02);
+}
+
+const SFX={
+  place(){ playTone(520,0.09,'sine',0.11); },
+  rotate(){ playTone(340,0.06,'triangle',0.08); },
+  invalid(){ playTone(140,0.14,'sawtooth',0.09); },
+  hint(){ playTone(660,0.10,'sine',0.10,0); playTone(880,0.12,'sine',0.09,0.07); },
+  win(){
+    [523,659,784,1047].forEach((f,i)=>playTone(f,0.22,'sine',0.13,i*0.09));
+  },
+  titleUp(){
+    [660,880,1108,1320].forEach((f,i)=>playTone(f,0.28,'triangle',0.12,i*0.07));
+  },
+  rankUp(){ playTone(700,0.08,'sine',0.10,0); playTone(1050,0.14,'sine',0.11,0.09); },
+  rankDown(){ playTone(420,0.10,'sine',0.08,0); playTone(280,0.16,'sine',0.08,0.09); },
+  click(){ playTone(380,0.05,'sine',0.06); },
+};
+
+function haptic(pattern){
+  if(!HAPTIC_ON) return;
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+}
+const HAPTICS={
+  place(){ haptic(12); },
+  rotate(){ haptic(8); },
+  invalid(){ haptic([20,40,20]); },
+  win(){ haptic([15,40,15,40,30]); },
+  titleUp(){ haptic([20,30,20,30,20,30,50]); },
+};
+
+function toggleSound(){
+  SOUND_ON=!SOUND_ON;
+  localStorage_set('pz_sound', SOUND_ON?'1':'0');
+  updateSoundToggleUI();
+  if(SOUND_ON) SFX.click();
+}
+function toggleHaptic(){
+  HAPTIC_ON=!HAPTIC_ON;
+  localStorage_set('pz_haptic', HAPTIC_ON?'1':'0');
+  updateHapticToggleUI();
+  if(HAPTIC_ON) haptic(15);
+}
+function updateSoundToggleUI(){
+  const btn=document.getElementById('soundToggleBtn');
+  if(btn) btn.textContent = SOUND_ON ? '🔊' : '🔇';
+}
+function updateHapticToggleUI(){
+  const btn=document.getElementById('hapticToggleBtn');
+  if(btn) btn.textContent = HAPTIC_ON ? '📳' : '📴';
+}
+
+// ═══════════════════════════════════════════════════════
+// ŞEKİL KÜTÜPHANESİ
+// ═══════════════════════════════════════════════════════
+const SHAPES={
+  I2:   {cells:[[0,0],[1,0]],                          color:'#7830c0', dark:'#4a1880'},
+  I3:   {cells:[[0,0],[1,0],[2,0]],                    color:'#906030', dark:'#5a3a18'},
+  L3:   {cells:[[0,0],[1,0],[1,1]],                    color:'#d85810', dark:'#883008'},
+  I4:   {cells:[[0,0],[0,1],[0,2],[0,3]],              color:'#8898a8', dark:'#505c68'},
+  O4:   {cells:[[0,0],[0,1],[1,0],[1,1]],              color:'#f0c018', dark:'#a07800'},
+  T4:   {cells:[[0,0],[1,0],[2,0],[1,1]],              color:'#4a3020', dark:'#241408'},
+  S4:   {cells:[[0,0],[0,1],[1,1],[1,2]],              color:'#283890', dark:'#101c60'},
+  L4:   {cells:[[0,0],[1,0],[2,0],[2,1]],              color:'#e05890', dark:'#98305c'},
+  L5:   {cells:[[0,0],[0,1],[0,2],[1,0],[2,0]],        color:'#cc2828', dark:'#881010'},
+  P5:   {cells:[[0,0],[0,1],[1,0],[1,1],[2,0]],        color:'#18a0a0', dark:'#0a6060'},
+  T5:   {cells:[[0,0],[0,1],[0,2],[1,1],[2,1]],        color:'#a04ac0', dark:'#642a80'},
+  W5:   {cells:[[0,0],[1,0],[1,1],[2,1],[2,2]],        color:'#60a018', dark:'#3a6408'},
+  Z5:   {cells:[[0,0],[0,1],[1,1],[2,1],[2,2]],        color:'#c07818', dark:'#7a4a08'},
+  N5:   {cells:[[0,0],[1,0],[1,1],[2,1],[3,1]],        color:'#3050a0', dark:'#1a3068'},
+  Y5:   {cells:[[0,0],[1,0],[2,0],[3,0],[1,1]],        color:'#a83060', dark:'#6a1838'},
+  V5:   {cells:[[0,0],[1,0],[2,0],[2,1],[2,2]],        color:'#20906a', dark:'#105842'},
+  CROSS:{cells:[[0,1],[1,0],[1,1],[1,2],[2,1]],        color:'#18a838', dark:'#0a6020'},
+  R6:   {cells:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]],  color:'#1868c8', dark:'#083888'},
+};
+
+// Grid boyutuna göre parça setleri (doğrulanmış: %100 çözülebilir)
+const SETS={
+  5:['L5','P5','S4','O4','T4','I2'],
+  6:['L5','P5','T5','W5','S4','O4','T4','L3'],
+  7:['CROSS','L5','W5','Z5','T5','P5','S4','O4','L4','R6'],
+  8:['R6','R6','R6','L5','P5','T5','W5','Z5','N5','O4','T4','S4','I3'],
+  9:['R6','R6','R6','R6','L5','P5','T5','W5','Z5','N5','Y5','V5','O4','T4','S4','L4'],
+};
+
+// AŞAMALI ŞEKİL TANITIMI — TÜM grid boyutlarında (5×5'ten 9×9'a) her 3
+// bölümde bir yeni bir parça şekli tanıtılır. Her tier, bağımsız bir
+// exact-cover backtracking çözücüsüyle o grid boyutunun TÜM hedef-hücre
+// pozisyonları (5×5'te 25, 6×6'da 36, ..., 9×9'da 81) için AYRI AYRI
+// doğrulanmıştır — sadece hücre sayısı toplamının uyması ÇÖZÜLEBİLİRLİĞİ
+// GARANTİ ETMEZ, her kombinasyon gerçekten test edilmiştir. Toplam 255
+// bölümün tamamını kapsayan 87 tier (5×5: 9, 6×6: 12, 7×7: 17, 8×8: 22,
+// 9×9: 27), tasarım aşamasında VE ayrı, bağımsız bir doğrulama geçişinde
+// olmak üzere İKİ KEZ test edilmiştir.
+const TIERS5=[
+  ['L5','P5','S4','O4','T4','I2'],   // tier0 (bölüm 1-3): baz set
+  ['L3','P5','S4','Y5','Y5','I2'],   // tier1 (bölüm 4-6): + L3
+  ['I3','L3','S4','Y5','P5','O4'],   // tier2 (bölüm 7-9): + I3
+  ['T5','L3','P5','T4','W5','I2'],   // tier3 (bölüm 10-12): + T5
+  ['W5','P5','I3','I4','Y5','I2'],   // tier4 (bölüm 13-15): + W5
+  ['V5','L4','L5','S4','I4','I2'],   // tier5 (bölüm 16-18): + V5
+  ['N5','T4','L3','P5','W5','I2'],   // tier6 (bölüm 19-21): + N5
+  ['Z5','P5','L5','I3','I4','I2'],   // tier7 (bölüm 22-24): + Z5
+  ['Y5','S4','T5','L3','Y5','I2'],   // tier8 (bölüm 25): + Y5
+];
+
+const TIERS6=[
+  ['L5','P5','T5','W5','S4','O4','T4','L3'],
+  ['I2','L4','P5','V5','S4','T5','Y5','L3','I2'],
+  ['I3','N5','Y5','P5','S4','I4','T5','O4'],
+  ['L3','I2','Y5','S4','R6','I4','W5','I2','T4'],
+  ['I4','W5','I2','L5','O4','I3','N5','T4','I3'],
+  ['O4','L3','O4','Z5','W5','V5','T4','V5'],
+  ['T4','CROSS','P5','T4','CROSS','I2','L3','L3','I2','I2'],
+  ['S4','R6','Y5','O4','L3','O4','P5','T4'],
+  ['L4','Z5','L3','I3','R6','R6','W5','I3'],
+  ['L5','L4','I4','L5','T4','I2','I2','Z5','L4'],
+  ['P5','I3','T5','L4','L5','V5','S4','T4'],
+  ['T5','Z5','I3','L4','CROSS','L3','S4','O4','I2'],
+];
+
+const TIERS7=[
+  ['CROSS','L5','W5','Z5','T5','P5','S4','O4','L4','R6'],
+  ['I2','Z5','V5','N5','S4','S4','Z5','I3','N5','Y5','Y5'],
+  ['I3','V5','O4','N5','Y5','I3','CROSS','L4','L5','Y5','L4'],
+  ['L3','S4','P5','P5','T5','Y5','L4','W5','I3','S4','Z5'],
+  ['I4','W5','I4','S4','T5','I2','L3','CROSS','Z5','T5','I4','I2'],
+  ['O4','T4','L5','V5','P5','O4','R6','T4','R6','Y5'],
+  ['T4','O4','Y5','I3','I2','T4','W5','Y5','Y5','O4','I2','V5'],
+  ['S4','I4','S4','T4','I2','I3','L3','V5','Z5','I2','W5','S4','L3'],
+  ['L4','S4','I2','I3','N5','I3','T5','CROSS','CROSS','Z5','Z5','I2'],
+  ['L5','W5','P5','O4','L4','S4','I4','R6','R6','Y5'],
+  ['P5','V5','Z5','R6','R6','I4','L5','L4','P5','L3'],
+  ['T5','W5','L5','S4','S4','P5','S4','T4','Y5','I2','I3','I2'],
+  ['W5','P5','T5','S4','O4','O4','Z5','I2','I2','I3','P5','S4'],
+  ['Z5','T5','O4','L3','Z5','I3','Y5','W5','O4','P5','O4'],
+  ['N5','Y5','L4','P5','S4','I2','CROSS','Y5','S4','S4','I2','I3'],
+  ['Y5','T5','S4','L3','CROSS','L4','T5','P5','S4','W5','L3'],
+  ['V5','P5','T4','Y5','Z5','W5','N5','Z5','L5','I4'],
+];
+
+const TIERS8=[
+  ['R6','R6','R6','L5','P5','T5','W5','Z5','N5','O4','T4','S4','I3'],
+  ['I2','Z5','O4','V5','P5','I2','N5','L5','I3','L4','S4','T5','O4','T4','S4','I2'],
+  ['I3','L5','S4','CROSS','T4','Z5','I3','V5','CROSS','O4','T4','L3','L3','V5','N5'],
+  ['L3','O4','S4','CROSS','Y5','W5','CROSS','N5','T5','I3','V5','Y5','N5','I2','I2'],
+  ['I4','Z5','N5','L3','S4','Y5','CROSS','T4','T5','R6','R6','V5','R6'],
+  ['O4','L3','L5','L5','I2','N5','Z5','S4','I3','P5','T4','L5','CROSS','T4','S4'],
+  ['T4','T5','I4','T4','V5','L5','CROSS','W5','T4','N5','T5','R6','T4','I2'],
+  ['S4','L3','I2','I3','L4','V5','T5','Z5','R6','R6','L4','Y5','L3','Y5','I3'],
+  ['L4','P5','O4','Z5','Y5','Y5','CROSS','O4','O4','CROSS','L4','I2','I4','V5','I2'],
+  ['L5','I4','I4','Y5','W5','N5','T5','I2','L3','I4','L5','Y5','O4','L3','S4'],
+  ['P5','Z5','T5','I2','CROSS','L5','L4','Y5','V5','T5','L3','I2','L3','I4','T5'],
+  ['T5','O4','I4','O4','S4','S4','I4','L3','L5','L5','P5','N5','N5','T4','I2'],
+  ['W5','W5','V5','Z5','O4','Y5','Z5','W5','W5','S4','T5','P5','W5'],
+  ['Z5','Z5','O4','N5','I2','V5','O4','CROSS','S4','I3','T5','V5','I4','N5','I2'],
+  ['N5','P5','L3','L3','T4','CROSS','I3','L4','W5','S4','P5','Z5','I4','T4','L4'],
+  ['Y5','T4','Z5','CROSS','R6','S4','L5','L4','T5','S4','W5','N5','R6'],
+  ['V5','L4','T5','W5','I2','Z5','V5','T4','I3','P5','W5','Z5','CROSS','L5'],
+  ['CROSS','P5','I2','W5','Y5','I2','L3','R6','L3','R6','T5','O4','L5','N5','I2'],
+  ['R6','S4','S4','CROSS','P5','CROSS','V5','I2','W5','W5','T4','L3','P5','T5'],
+  ['I2','W5','S4','CROSS','I3','W5','T4','L5','L5','L4','N5','W5','V5','L4','I2'],
+  ['I3','L4','O4','L4','T5','CROSS','CROSS','V5','T4','T4','T5','L4','Y5','I4','I2'],
+  ['L3','N5','V5','T4','P5','L4','T4','T5','I2','L3','S4','T5','S4','L4','O4','I2'],
+];
+
+const TIERS9=[
+  ['R6','R6','R6','R6','L5','P5','T5','W5','Z5','N5','Y5','V5','O4','T4','S4','L4'],
+  ['I2','Y5','N5','T4','R6','Z5','I4','CROSS','S4','P5','I2','CROSS','T5','W5','L5','S4','N5','I4'],
+  ['I3','Y5','L4','N5','L5','L5','CROSS','P5','S4','CROSS','I3','O4','W5','L3','Y5','I2','V5','N5','I2'],
+  ['L3','I4','CROSS','W5','I3','L5','R6','P5','N5','P5','S4','Y5','I2','T4','L3','R6','L3','L5','I2'],
+  ['I4','I4','L5','I4','N5','O4','L4','T4','N5','S4','L5','V5','S4','N5','L3','I4','L3','O4','S4'],
+  ['O4','L5','W5','L3','Y5','W5','W5','CROSS','I4','I3','N5','W5','CROSS','I3','O4','I3','V5','I2','I4'],
+  ['T4','I2','V5','I2','Y5','S4','L4','Y5','Z5','I2','L5','O4','R6','V5','L5','L3','Y5','R6','L3'],
+  ['S4','P5','CROSS','Z5','T4','V5','T4','R6','R6','I2','N5','Z5','V5','W5','Z5','V5','O4'],
+  ['L4','O4','T5','W5','T4','Z5','P5','P5','V5','I4','V5','S4','O4','T5','I3','L5','W5','L3'],
+  ['L5','P5','L3','W5','W5','P5','I4','L3','Z5','L3','L5','I4','V5','L5','V5','T4','N5','T4'],
+  ['P5','R6','Y5','O4','O4','L4','L4','L3','R6','I4','I2','S4','T5','T4','S4','Z5','L5','L4','I2'],
+  ['T5','P5','I4','O4','O4','P5','T5','N5','I3','Z5','P5','Z5','I3','Y5','Z5','Z5','L3','I4'],
+  ['W5','L3','R6','W5','T4','CROSS','O4','S4','I4','P5','N5','Y5','I3','I2','O4','T5','N5','I4','I2'],
+  ['Z5','Z5','V5','R6','T4','W5','O4','V5','Z5','L5','W5','L3','W5','L4','L5','P5','T4'],
+  ['N5','L5','N5','CROSS','V5','L3','T5','N5','P5','R6','W5','O4','N5','CROSS','N5','I3','S4'],
+  ['Y5','L4','I2','CROSS','I2','R6','I3','Y5','W5','O4','I3','R6','O4','S4','V5','I3','W5','T5','O4'],
+  ['V5','I3','I4','I4','Y5','L3','I4','I3','I2','I4','P5','L5','T5','P5','L4','Y5','P5','V5','O4'],
+  ['CROSS','I2','V5','O4','W5','L5','I3','O4','I3','Y5','N5','T4','L4','N5','Z5','L4','L3','Z5','L4'],
+  ['R6','Y5','R6','V5','Z5','T4','W5','I3','P5','L5','I3','S4','V5','I4','P5','T5','I3','I2'],
+  ['I2','W5','W5','L5','W5','I2','N5','L3','L5','I4','L5','CROSS','N5','T4','R6','P5','T4','W5'],
+  ['I3','Y5','V5','CROSS','N5','I3','T4','L4','O4','O4','L4','R6','L5','Y5','O4','T4','T4','I4','I2'],
+  ['L3','Z5','R6','T4','Z5','N5','W5','S4','P5','O4','L3','I2','L5','L3','S4','N5','L4','S4','I4'],
+  ['I4','I3','V5','T4','T4','W5','T4','Z5','L4','Z5','T5','Z5','I2','T5','L3','W5','I3','T5','T4'],
+  ['O4','L3','T5','W5','CROSS','T5','V5','W5','I3','I2','W5','I3','V5','S4','T5','I3','R6','S4','L3'],
+  ['T4','L5','T5','Y5','I2','Y5','W5','T5','N5','O4','N5','L5','S4','CROSS','O4','P5','V5','I2'],
+  ['S4','T5','N5','O4','I3','Y5','T4','N5','Z5','V5','T5','P5','L4','W5','Z5','N5','I3','I3'],
+  ['L4','I4','Y5','N5','Y5','I3','L4','L3','I2','R6','Y5','I3','L5','CROSS','I3','T4','Z5','I3','R6'],
+];
+
+// Belirli bir bölüm için doğru parça setini döndürür. TÜM grid boyutları
+// (5-9) artık aşamalı (her 3 bölümde bir yeni şekil) — her tier, bağımsız
+// bir exact-cover backtracking çözücüsüyle o grid boyutunun TÜM hedef-hücre
+// pozisyonları için AYRI AYRI ve İKİ KEZ (tasarım + bağımsız doğrulama
+// geçişi) test edilmiştir.
+const TIER_TABLE={5:TIERS5, 6:TIERS6, 7:TIERS7, 8:TIERS8, 9:TIERS9};
+function shapeSetFor(grid, local){
+  const tiers=TIER_TABLE[grid];
+  if(!tiers) return SETS[grid];
+  const tierIdx=Math.min(Math.floor(local/3), tiers.length-1);
+  return tiers[tierIdx];
+}
+
+// Bölüm yapısı: 25×(5x5) + 36×(6x6) + 49×(7x7) + 64×(8x8) + 81×(9x9) = 255 bölüm
+const STAGES=[
+  {grid:5, count:25},
+  {grid:6, count:36},
+  {grid:7, count:49},
+  {grid:8, count:64},
+  {grid:9, count:81},
+];
+const TOTAL_LEVELS=STAGES.reduce((s,st)=>s+st.count,0);
+
+function levelInfo(idx){ // idx: 0-based genel bölüm no
+  let off=0;
+  for(const st of STAGES){
+    if(idx<off+st.count){
+      const local=idx-off; // 0-based bu aşamada
+      const col=Math.floor(local/st.grid);
+      const row=local%st.grid;
+      return {grid:st.grid, emptyR:row, emptyC:col, cellNum:local+1, local};
+    }
+    off+=st.count;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════
+// YARDIMCILAR
+// ═══════════════════════════════════════════════════════
+function rotCells(cells,rot){
+  let c=cells.map(r=>[...r]);
+  for(let k=0;k<rot;k++) c=c.map(([r,col])=>[col,-r]);
+  const mr=Math.min(...c.map(([r])=>r));
+  const mc=Math.min(...c.map(([,col])=>col));
+  return c.map(([r,col])=>[r-mr,col-mc]);
+}
+function flipCells(cells){
+  const mc=Math.max(...cells.map(([,c])=>c));
+  return cells.map(([r,c])=>[r,mc-c]);
+}
+// 8 duruş: rot0-3 normal, rot0-3 flip
+function orientCells(base,ori){
+  const flip=ori>=4;
+  const rot=ori%4;
+  return rotCells(flip?flipCells(base):base, rot);
+}
+function bbOf(cells){
+  return{rows:Math.max(...cells.map(([r])=>r))+1,
+         cols:Math.max(...cells.map(([,c])=>c))+1};
+}
+// Bir parçanın OLASI TÜM dönüşlerindeki (8 yönelim) en büyük satır/sütun
+// boyutunu döndürür — parça döndürülünce (ör. 4×2 → 2×4) tepsideki PAYLAŞILAN
+// hücre boyutunun değişip TÜM parçaların aniden büyüyüp küçülmesini önlemek
+// için kullanılır. Her farklı şekil tanımı için bir kez hesaplanıp önbelleğe
+// alınır (performans).
+const _maxBBoxCache=new Map();
+function maxBBoxOf(baseCells){
+  const key=JSON.stringify(baseCells);
+  if(_maxBBoxCache.has(key)) return _maxBBoxCache.get(key);
+  let maxRows=0, maxCols=0;
+  for(let ori=0; ori<8; ori++){
+    const bb=bbOf(orientCells(baseCells, ori));
+    maxRows=Math.max(maxRows, bb.rows);
+    maxCols=Math.max(maxCols, bb.cols);
+  }
+  const result={rows:maxRows, cols:maxCols};
+  _maxBBoxCache.set(key, result);
+  return result;
+}
+function getEv(e){
+  if(e.touches&&e.touches.length) return{x:e.touches[0].clientX,y:e.touches[0].clientY};
+  if(e.changedTouches&&e.changedTouches.length) return{x:e.changedTouches[0].clientX,y:e.changedTouches[0].clientY};
+  return{x:e.clientX,y:e.clientY};
+}
+
+// ═══════════════════════════════════════════════════════
+// DOM & STATE
+// ═══════════════════════════════════════════════════════
+const bwrap=document.getElementById('bwrap');
+const boardEl=document.getElementById('board');
+const gc=document.getElementById('gc');
+const pcEl=document.getElementById('pc');
+const trayEl=document.getElementById('tray');
+const statusEl=document.getElementById('status');
+const dlayer=document.getElementById('dlayer');
+const lvlBadge=document.getElementById('lvlBadge');
+const subTxt=document.getElementById('subTxt');
+const winOverlay=document.getElementById('winOverlay');
+const gctx=gc.getContext('2d');
+const pctx=pcEl.getContext('2d');
+const dctx=dlayer.getContext('2d');
+
+let LEVEL=parseInt(localStorage_get('pz_level')||'0'); // 0-based, mevcut oynanan bölüm
+if(isNaN(LEVEL)||LEVEL<0||LEVEL>=TOTAL_LEVELS) LEVEL=0;
+
+// En yüksek ulaşılan bölüm — IQ/ünvan bundan hesaplanır (geri gidilince düşmesin)
+let MAX_LEVEL=parseInt(localStorage_get('pz_maxlevel')||'0');
+if(isNaN(MAX_LEVEL)||MAX_LEVEL<LEVEL) MAX_LEVEL=LEVEL;
+
+// EARNED_LEVEL: IQ/puan/ünvan hesaplamasının dayandığı GERÇEK (ödüllendirilen)
+// ilerleme. MAX_LEVEL sadece navigasyon sınırıdır (reklamla atlanan bölümler
+// dahil ilerler — bölüm geçilebilsin diye), ama EARNED_LEVEL sadece normal
+// (reklamsız) ilk çözümlerde ilerler. Var olan oyuncular için migration:
+// bu anahtar daha önce hiç yazılmamışsa MAX_LEVEL ile başlatılır, geriye
+// dönük IQ/ünvan kaybı yaşanmasın diye.
+let EARNED_LEVEL=(()=>{
+  const saved=localStorage_get('pz_earnedlevel');
+  if(saved===null) return MAX_LEVEL;
+  const n=parseInt(saved);
+  return isNaN(n)?MAX_LEVEL:n;
+})();
+
+function localStorage_get(k){ try{return localStorage.getItem(k);}catch(e){return null;} }
+function localStorage_set(k,v){ try{localStorage.setItem(k,v);}catch(e){} }
+
+let GRID=5, EMPTY_R=0, EMPTY_C=0, CELL_NUM=1;
+let CURRENT_SHAPE_SET=SETS[5]; // aktif bölümün gerçek parça listesi (5×5'te tier'e göre değişir)
+let CS=50;
+const pieces={};
+const boardMap={};
+
+// ═══════════════════════════════════════════════════════
+// LAYOUT
+// ═══════════════════════════════════════════════════════
+function trayRowsFor(n){
+  if(n<=4) return 1;
+  if(n<=8) return 2;
+  if(n<=12) return 3;
+  return 4; // 13-16 parça
+}
+
+function setupLayout(){
+  const vw=window.innerWidth, vh=window.innerHeight;
+  const topH=document.querySelector('.topbar').offsetHeight
+    +document.querySelector('.sub').offsetHeight;
+  const ftH=document.querySelector('footer').offsetHeight||44;
+  const stH=20;
+
+  // Parça sayısına göre tepsi satırı
+  const n=(CURRENT_SHAPE_SET||[]).length;
+  const rows=trayRowsFor(n);
+  // Kompakt tepsi: board ana odak
+  const minRowH=Math.max(40,Math.floor(vh*0.062));
+  const trayH=rows*minRowH+6;
+
+  const availH=vh-topH-ftH-stH-trayH-58;
+  const availW=vw*0.94;
+  const sz=Math.min(availW,availH);
+  CS=Math.max(20,Math.floor(sz/GRID));
+  const bp=CS*GRID;
+
+  bwrap.style.width=bp+'px'; bwrap.style.height=bp+'px';
+  boardEl.style.width=bp+'px'; boardEl.style.height=bp+'px';
+  [gc,pcEl].forEach(c=>{
+    c.width=bp;c.height=bp;
+    c.style.width=bp+'px';c.style.height=bp+'px';
+  });
+  dlayer.width=vw;dlayer.height=vh;
+  dlayer.style.width=vw+'px';dlayer.style.height=vh+'px';
+  trayEl.style.height=trayH+'px';
+}
+
+// ═══════════════════════════════════════════════════════
+// ÇİZİM
+// ═══════════════════════════════════════════════════════
+function drawGrid(){
+  const sz=CS*GRID;
+  gctx.clearRect(0,0,sz,sz);
+  gctx.fillStyle='#f7f3eb';
+  gctx.beginPath();gctx.roundRect(0,0,sz,sz,6);gctx.fill();
+  gctx.strokeStyle='#cbbfa8';gctx.lineWidth=1;
+  for(let i=0;i<=GRID;i++){
+    gctx.beginPath();gctx.moveTo(i*CS,0);gctx.lineTo(i*CS,sz);gctx.stroke();
+    gctx.beginPath();gctx.moveTo(0,i*CS);gctx.lineTo(sz,i*CS);gctx.stroke();
+  }
+  gctx.textAlign='center';gctx.textBaseline='middle';
+  gctx.font=`${Math.max(7,Math.floor(CS*.24))}px sans-serif`;
+  for(let col=0;col<GRID;col++)
+    for(let row=0;row<GRID;row++){
+      const num=col*GRID+row+1;
+      if(row===EMPTY_R&&col===EMPTY_C){
+        // Hedef boş kare: vurgulu
+        gctx.fillStyle='rgba(255,64,64,.16)';
+        gctx.fillRect(col*CS+1,row*CS+1,CS-2,CS-2);
+        gctx.fillStyle='#e04040';
+        gctx.font=`bold ${Math.max(8,Math.floor(CS*.3))}px sans-serif`;
+        gctx.fillText(num,col*CS+CS*.5,row*CS+CS*.5);
+        gctx.font=`${Math.max(7,Math.floor(CS*.24))}px sans-serif`;
+      } else {
+        gctx.fillStyle='#bab0a0';
+        gctx.fillText(num,col*CS+CS*.5,row*CS+CS*.5);
+      }
+    }
+  gctx.strokeStyle='#8a7858';gctx.lineWidth=2;
+  gctx.strokeRect(1,1,sz-2,sz-2);
+}
+
+function drawCells(ctx,cells,cs,color,dark,ox=0,oy=0,alpha=1){
+  ctx.save();ctx.globalAlpha=alpha;
+  cells.forEach(([r,c])=>{
+    const x=ox+c*cs,y=oy+r*cs,p=Math.max(2,cs*.04),rr=Math.max(3,cs*.1);
+    ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=cs*.16;ctx.shadowOffsetY=cs*.05;
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.roundRect(x+p,y+p,cs-p*2,cs-p*2,rr);ctx.fill();
+    ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+    ctx.strokeStyle=dark;ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(x+p,y+p,cs-p*2,cs-p*2,rr);ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.40)';
+    ctx.beginPath();ctx.roundRect(x+p+3,y+p+3,cs*.36,cs*.14,cs*.05);ctx.fill();
+  });
+  ctx.restore();
+}
+
+function renderPlaced(){
+  const sz=CS*GRID;
+  pctx.clearRect(0,0,sz,sz);
+  Object.values(pieces).filter(p=>p.onBoard).forEach(p=>{
+    drawCells(pctx,p.cells,CS,p.def.color,p.def.dark,p.gridC*CS,p.gridR*CS);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// TEPSİ
+// ═══════════════════════════════════════════════════════
+function buildTray(){
+  trayEl.innerHTML='';
+  const ids=Object.keys(pieces);
+  const n=ids.length;
+  const vw=window.innerWidth;
+  const th=trayEl.offsetHeight||80;
+  const BOX_PAD=4;
+  const GAP=Math.max(3,Math.floor(vw*.01));
+
+  const rows=trayRowsFor(n);
+  const perRow=Math.ceil(n/rows);
+
+  // Kutu boyutları: kesin hesap
+  const boxW=Math.floor((vw-GAP*(perRow+1))/perRow);
+  const boxH=Math.floor((th-GAP*(rows+1))/rows);
+
+  // Hücre boyutu: en büyük parça kutuya sığmalı. ÖNEMLİ: parçanın ŞU ANKİ
+  // (döndürülmüş) sınırlayıcı kutusu değil, o parçanın OLASI TÜM
+  // dönüşlerindeki en büyük kutusu kullanılıyor — aksi hâlde bir parçayı
+  // döndürmek (ör. 4×2 → 2×4) paylaşılan cellSz'i değiştirip TÜM tepsinin
+  // aniden büyüyüp küçülmesine yol açıyordu.
+  const maxCols=Math.max(...ids.map(id=>maxBBoxOf(pieces[id].def.cells).cols));
+  const maxRows=Math.max(...ids.map(id=>maxBBoxOf(pieces[id].def.cells).rows));
+  const cellSz=Math.max(8,Math.min(
+    Math.floor((boxW-BOX_PAD*2)/maxCols),
+    Math.floor((boxH-BOX_PAD*2)/maxRows)
+  ));
+
+  // CSS grid şablonu
+  trayEl.style.gridTemplateColumns=`repeat(${perRow}, ${boxW}px)`;
+  trayEl.style.gridTemplateRows=`repeat(${rows}, ${boxH}px)`;
+  trayEl.style.gap=GAP+'px';
+  trayEl.style.padding='0';
+
+  ids.forEach(id=>{
+    const p=pieces[id];
+    const bb=bbOf(p.cells);
+    const cw=bb.cols*cellSz, ch=bb.rows*cellSz;
+
+    const box=document.createElement('div');
+    box.className='pbox'+(p.onBoard?' placed':'');
+    box.style.width=boxW+'px';
+    box.style.height=boxH+'px';
+
+    const cvs=document.createElement('canvas');
+    cvs.width=cw;cvs.height=ch;
+    cvs.style.width=cw+'px';cvs.style.height=ch+'px';
+    drawCells(cvs.getContext('2d'),p.cells,cellSz,p.def.color,p.def.dark,0,0,p.onBoard?.4:1);
+    box.appendChild(cvs);
+
+    p._box=box;p._cellSz=cellSz;
+    if(!p.onBoard) attachBoxEvents(box,p);
+    trayEl.appendChild(box);
+  });
+
+  if(typeof LEVEL1_GUIDE_ACTIVE!=='undefined' && LEVEL1_GUIDE_ACTIVE){
+    updateLevel1GuidePointer();
+  }
+}
+
+function attachBoxEvents(box,p){
+  let moved=false,sx=0,sy=0;
+  function onDown(e){
+    e.preventDefault();e.stopPropagation();
+    if(p.onBoard) return;
+    const ev=getEv(e);
+    sx=ev.x;sy=ev.y;moved=false;
+    function onMove(e2){
+      e2.preventDefault();
+      const ev2=getEv(e2);
+      if(!moved&&Math.abs(ev2.x-sx)+Math.abs(ev2.y-sy)>7){
+        moved=true;
+        beginDrag(p,ev2.x,ev2.y);
+        cleanup();
+      }
+    }
+    function onUp(){
+      if(!moved) doRotate(p);
+      moved=false;cleanup();
+    }
+    function cleanup(){
+      window.removeEventListener('mousemove',onMove);
+      window.removeEventListener('touchmove',onMove);
+      window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchend',onUp);
+    }
+    window.addEventListener('mousemove',onMove,{passive:false});
+    window.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchend',onUp);
+  }
+  box.addEventListener('mousedown',onDown);
+  box.addEventListener('touchstart',onDown,{passive:false});
+}
+
+// ═══════════════════════════════════════════════════════
+// DÖNDÜRME  (8 duruş: 4 rot + 4 flip-rot)
+// ═══════════════════════════════════════════════════════
+let toastTimer=null;
+function showToast(msg,durationMs){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),durationMs||900);
+}
+
+function doRotate(p){
+  const wasOn=p.onBoard,oR=p.gridR,oC=p.gridC;
+  if(wasOn) lift(p);
+  p.ori=(p.ori+1)%8;
+  p.cells=orientCells(p.def.cells,p.ori);
+  if(wasOn&&canPlace(p.cells,oR,oC,p.id)){
+    place(p,oR,oC);
+  }
+  renderPlaced();
+  buildTray();
+  checkWin().catch(e=>console.error('checkWin hata (rotate):',e));
+  const isFlip=p.ori>=4;
+  showToast(isFlip?'⇋ Ayna + '+(p.ori%4)*90+'°':'↻ '+(p.ori%4)*90+'° döndü');
+  SFX.rotate(); HAPTICS.rotate();
+  if(typeof LEVEL1_GUIDE_ACTIVE!=='undefined' && LEVEL1_GUIDE_ACTIVE
+     && LEVEL1_GUIDE_PIECE_ID===p.id && LEVEL1_GUIDE_PHASE==='rotate'){
+    checkLevel1GuideRotation();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BOARD OPS
+// ═══════════════════════════════════════════════════════
+function canPlace(cells,r,c,excl){
+  for(const[dr,dc]of cells){
+    const nr=r+dr,nc=c+dc;
+    if(nr<0||nr>=GRID||nc<0||nc>=GRID) return false;
+    if(nr===EMPTY_R&&nc===EMPTY_C) return false; // hedef kare her zaman boş
+    const k=`${nr},${nc}`;
+    if(boardMap[k]&&boardMap[k]!==excl) return false;
+  }
+  return true;
+}
+function place(p,r,c){
+  lift(p);
+  p.gridR=r;p.gridC=c;p.onBoard=true;
+  p.cells.forEach(([dr,dc])=>{boardMap[`${r+dr},${c+dc}`]=p.id;});
+}
+function lift(p){
+  if(!p.onBoard) return;
+  p.cells.forEach(([dr,dc])=>{delete boardMap[`${p.gridR+dr},${p.gridC+dc}`];});
+  p.gridR=-1;p.gridC=-1;p.onBoard=false;
+}
+
+// ═══════════════════════════════════════════════════════
+// SÜRÜKLEME
+// ═══════════════════════════════════════════════════════
+let drag=null;
+
+function beginDrag(p,cx,cy){
+  const bb=bbOf(p.cells);
+  drag={p,ox:-bb.cols*CS/2,oy:-bb.rows*CS/2};
+  moveDrag(cx,cy);
+  function onMove(e){
+    e.preventDefault();
+    const ev=getEv(e);moveDrag(ev.x,ev.y);
+  }
+  function onUp(e){
+    const ev=getEv(e);endDrag(ev.x,ev.y);
+    window.removeEventListener('mousemove',onMove);
+    window.removeEventListener('touchmove',onMove);
+    window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchend',onUp);
+  }
+  window.addEventListener('mousemove',onMove,{passive:false});
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('mouseup',onUp);
+  window.addEventListener('touchend',onUp);
+}
+
+function snapPos(cx,cy,cells){
+  const br=boardEl.getBoundingClientRect();
+  const bb=bbOf(cells);
+  return{
+    sr:Math.round((cy-br.top)/CS-bb.rows/2),
+    sc:Math.round((cx-br.left)/CS-bb.cols/2)
+  };
+}
+
+// İpucu ile yerleştirilen parçanın etrafında kısa süreli sönümlenen bir
+// vurgu halkası çizer — kullanıcı hangi parçanın ipucuyla yerleştirildiğini
+// net görebilsin diye (önceki sürümde parça sessizce beliriyordu).
+function pulseHintHighlight(cells,gridR,gridC){
+  const br=boardEl.getBoundingClientRect();
+  const dur=650;
+  const t0=performance.now();
+  function step(now){
+    const t=Math.min(1,(now-t0)/dur);
+    dctx.clearRect(0,0,dlayer.width,dlayer.height);
+    if(t<1){
+      dctx.save();
+      dctx.globalAlpha=1-t;
+      dctx.strokeStyle='#ffd040';
+      dctx.lineWidth=3+2*(1-t);
+      cells.forEach(([r,c])=>{
+        const x=br.left+(gridC+c)*CS+2, y=br.top+(gridR+r)*CS+2, s=CS-4, rr=Math.max(3,CS*.12);
+        dctx.beginPath();dctx.roundRect(x,y,s,s,rr);dctx.stroke();
+      });
+      dctx.restore();
+      requestAnimationFrame(step);
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function moveDrag(cx,cy){
+  if(!drag) return;
+  dctx.clearRect(0,0,dlayer.width,dlayer.height);
+  drawCells(dctx,drag.p.cells,CS,drag.p.def.color,drag.p.def.dark,
+            cx+drag.ox,cy+drag.oy);
+  const{sr,sc}=snapPos(cx,cy,drag.p.cells);
+  const bb=bbOf(drag.p.cells);
+  if(sr>=0&&sc>=0&&sr+bb.rows<=GRID&&sc+bb.cols<=GRID
+     &&canPlace(drag.p.cells,sr,sc,drag.p.id)){
+    drawGrid();
+    gctx.save();
+    gctx.strokeStyle='rgba(0,220,255,.85)';gctx.lineWidth=2;
+    gctx.setLineDash([5,3]);
+    drag.p.cells.forEach(([r,c])=>{
+      const x=(sc+c)*CS+3,y=(sr+r)*CS+3,s=CS-6,rr=Math.max(3,CS*.1);
+      gctx.fillStyle='rgba(0,220,255,.18)';
+      gctx.beginPath();gctx.roundRect(x,y,s,s,rr);gctx.fill();
+      gctx.beginPath();gctx.roundRect(x,y,s,s,rr);gctx.stroke();
+    });
+    gctx.setLineDash([]);gctx.restore();
+  } else {
+    drawGrid();
+  }
+}
+
+function endDrag(cx,cy){
+  if(!drag) return;
+  const p=drag.p;
+  dctx.clearRect(0,0,dlayer.width,dlayer.height);
+  drawGrid();
+  const{sr,sc}=snapPos(cx,cy,p.cells);
+  const bb=bbOf(p.cells);
+  if(sr>=0&&sc>=0&&sr+bb.rows<=GRID&&sc+bb.cols<=GRID
+     &&canPlace(p.cells,sr,sc,p.id)){
+    place(p,sr,sc);
+    addScoreIfFirstTime(p.cells.length); // doğru hamle puanı: sadece ilk çözümde
+    renderPlaced();buildTray();checkWin().catch(e=>console.error('checkWin hata (place):',e));
+    SFX.place(); HAPTICS.place();
+    if(typeof LEVEL1_GUIDE_ACTIVE!=='undefined' && LEVEL1_GUIDE_ACTIVE && LEVEL1_GUIDE_PIECE_ID===p.id){
+      advanceLevel1Guide();
+    }
+  } else {
+    buildTray();
+    SFX.invalid(); HAPTICS.invalid();
+  }
+  drag=null;
+}
+
+// Board'daki parçaya dokun → kaldır / sürükle
+pcEl.addEventListener('mousedown',onBoardDown);
+pcEl.addEventListener('touchstart',onBoardDown,{passive:false});
+function onBoardDown(e){
+  e.preventDefault();
+  const br=pcEl.getBoundingClientRect();
+  const ev=getEv(e);
+  const col=Math.floor((ev.x-br.left)/CS);
+  const row=Math.floor((ev.y-br.top)/CS);
+  const pid=boardMap[`${row},${col}`];
+  if(!pid) return;
+  const p=pieces[pid];
+  let moved=false;
+  const sx=ev.x,sy=ev.y;
+  function onMove(e2){
+    e2.preventDefault();
+    const ev2=getEv(e2);
+    if(!moved&&Math.abs(ev2.x-sx)+Math.abs(ev2.y-sy)>6){
+      moved=true;
+      lift(p);renderPlaced();buildTray();
+      beginDrag(p,ev2.x,ev2.y);
+      cleanup();
+    }
+  }
+  function onUp(){
+    if(!moved){lift(p);renderPlaced();buildTray();statusEl.textContent='';}
+    cleanup();
+  }
+  function cleanup(){
+    window.removeEventListener('mousemove',onMove);
+    window.removeEventListener('touchmove',onMove);
+    window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchend',onUp);
+  }
+  window.addEventListener('mousemove',onMove,{passive:false});
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('mouseup',onUp);
+  window.addEventListener('touchend',onUp);
+}
+
+// ═══════════════════════════════════════════════════════
+// KAZANMA
+// ═══════════════════════════════════════════════════════
+async function checkWin(){
+  const all=Object.values(pieces);
+  const placed=all.filter(p=>p.onBoard).length;
+  if(placed<all.length){statusEl.textContent='';return;}
+
+  // Güvenlik ağı: boardMap'i gerçek parça konumlarından yeniden inşa et.
+  // Böylece herhangi bir yerleştirme akışında (ör. İpucu, reklamla çözüm)
+  // oluşabilecek senkron kayması, kazanma kontrolünü asla yanlış
+  // etkilemez — "tüm parçalar tahtada ama bölüm bitmiyor" durumuna karşı.
+  Object.keys(boardMap).forEach(k=>delete boardMap[k]);
+  all.forEach(p=>{
+    if(!p.onBoard) return;
+    p.cells.forEach(([dr,dc])=>{ boardMap[`${p.gridR+dr},${p.gridC+dc}`]=p.id; });
+  });
+
+  const empty=GRID*GRID-Object.keys(boardMap).length;
+  if(empty!==1){
+    statusEl.textContent=`${empty} ${T('empty')}`;
+    return;
+  }
+
+  statusEl.textContent='';
+
+  // Bulmaca her koşulda "çözülmüş" sayılır (bölüm ilerlemesi bu cihazda
+  // her zaman kaydedilir), ama PUAN/IQ/ÜNVAN/SIRALAMA sadece kullanıcı adı
+  // TANIMLI ve merkezi storage'a ERİŞİLEBİLİRSE (online) işlenir.
+  const isFirstTime=markLevelCompleted(LEVEL); // true = ilk kez çözülüyor
+  // Analytics: bölüm tamamlama — hangi bölümde oyuncuların takıldığı/bıraktığı
+  // (drop-off) Firebase Console'da funnel olarak görülebilsin diye standart
+  // 'level_end' olayını kullanıyoruz.
+  logAnalyticsEvent('level_end', {
+    level_name: String(LEVEL+1),
+    success: 1,
+    first_time: isFirstTime ? 1 : 0
+  });
+  // Puan/IQ/ünvan ilerlemesi sadece bölümün ilk çözümünde verilir.
+  const countsForProgress = isFirstTime;
+  if(isFirstTime){ registerStreakProgress(); } // günlük seri
+  if(LEVEL+1>MAX_LEVEL){
+    MAX_LEVEL=LEVEL+1;
+    localStorage_set('pz_maxlevel',String(MAX_LEVEL));
+    document.getElementById('nextBtn').disabled = LEVEL>=MAX_LEVEL || LEVEL>=TOTAL_LEVELS-1;
+  }
+  localStorage_set('pz_level',String(Math.min(LEVEL+1,TOTAL_LEVELS-1)));
+
+  const gainEl=document.getElementById('iqGain');
+  const badge=document.getElementById('titleUpBadge');
+  const labelTxt=document.getElementById('titleUpLabelTxt');
+  const rewardTxt=document.getElementById('titleUpReward');
+  const rankPanel=document.getElementById('rankShiftPanel');
+
+  // ÖNEMLİ: "Bölüm Tamamlandı" ekranı artık ASLA ağ isteklerini BEKLEMEZ.
+  // Önceki sürümde checkOnline()/fetchLeaderboardEntries()/addScore() işlemleri
+  // bitene kadar ekran hiç açılmıyordu — "çok geç geliyor" şikayetinin kök
+  // nedeni buydu. Şimdi: ekran ANINDA yerel veriyle açılır; ağ işlemleri arka
+  // planda yürür ve Şampiyonlar Ligi ruleti sadece kendi verisi hazır olunca
+  // (ekran hâlâ açıksa) oynatılır.
+  const online=!!(USERNAME && ONLINE_OK);
+  if(USERNAME){ checkOnline(); } // arka planda tazele, ama ekranı BEKLETME
+
+  if(!online){
+    gainEl.innerHTML='📡 '+T('offlineMode');
+    labelTxt.textContent='';
+    document.getElementById('titleUpName').textContent='';
+    rewardTxt.textContent='';
+    badge.classList.remove('show','titleChanged');
+    rankPanel.classList.remove('show');
+    SFX.win(); HAPTICS.win();
+    setTimeout(()=>{winOverlay.classList.add('show');},80);
+    return;
+  }
+
+  // ── ONLINE MOD: IQ/ünvan/puan hesapları TAMAMEN YEREL — anında hazır ──
+  const prevEarnedLevel=EARNED_LEVEL;
+  if(countsForProgress && LEVEL+1>EARNED_LEVEL){
+    EARNED_LEVEL=LEVEL+1;
+    localStorage_set('pz_earnedlevel',String(EARNED_LEVEL));
+  }
+  const oldIq=iqFor(prevEarnedLevel);
+  const newIq=iqFor(Math.min(EARNED_LEVEL,TOTAL_LEVELS-1));
+  const iqGain=countsForProgress ? (newIq-oldIq) : 0;
+  const oldTitle=titleFor(prevEarnedLevel);
+  const newTitle=titleFor(EARNED_LEVEL);
+  const titleChanged=countsForProgress && newTitle!==oldTitle;
+  // grantBonusHintIfDue() tamamen yerel/senkron (ağ gerektirmez) — anında çağrılabilir.
+  const gotBonus=countsForProgress && grantBonusHintIfDue();
+  // ÜNVAN ATLAMA ÖDÜLÜ: +50 bonus puan + 1 kalıcı ekstra ipucu hakkı (sadece reklamsız ilk çözümde)
+  const titleBonusScore=titleChanged?50:0;
+  if(titleChanged){
+    BONUS_HINTS++;
+    localStorage_set('pz_bonushints',String(BONUS_HINTS));
+  }
+
+  let html;
+  if(countsForProgress){
+    html='🧠 IQ +'+Math.max(0,iqGain);
+  } else {
+    html='🔁 '+T('alreadySolved');
+  }
+  if(gotBonus){
+    html+='<br>💡 '+T('bonusHint');
+  }
+  gainEl.innerHTML=html;
+
+  // ÜNVAN ROZETİ — her bölüm sonunda gösterilir. Ünvan gerçekten değiştiyse
+  // kutlama metniyle, değişmediyse mevcut ünvanı hatırlatan sade haliyle.
+  if(titleChanged){
+    labelTxt.textContent=T('newTitleLabel');
+    document.getElementById('titleUpName').textContent=newTitle;
+    rewardTxt.textContent='⭐ +'+titleBonusScore+'   💡 +1 '+T('hint');
+    badge.classList.add('titleChanged');
+    SFX.titleUp(); HAPTICS.titleUp();
+    pendingRatePrompt=true; // ünvan atlama — puanlama isteği için doğal bir an
+  } else {
+    labelTxt.textContent=T('currentTitleLabel');
+    document.getElementById('titleUpName').textContent=newTitle;
+    rewardTxt.textContent = countsForProgress ? ('⭐ +'+(GRID*10)) : T('alreadySolved');
+    badge.classList.remove('titleChanged');
+    SFX.win(); HAPTICS.win();
+  }
+  badge.classList.add('show');
+
+  setTimeout(()=>{winOverlay.classList.add('show');},80); // ANINDA — artık ağ beklemez
+
+  // Rulet panelini ANINDA (yükleniyor durumuyla) göster — veri gelene kadar
+  // boş/gizli kalıp aniden "belirmek" yerine kullanıcı sürecin başladığını görür.
+  rankPanel.classList.add('show');
+  document.getElementById('rankShiftTrack').innerHTML='';
+  const deltaEl0=document.getElementById('rankShiftDelta');
+  deltaEl0.className='same';
+  deltaEl0.textContent=T('rankLoading');
+
+  // ── ARKA PLAN: puanı gerçekten kaydet + liderlik tablosu ruleti ──
+  // winOverlay ZATEN AÇIK; bu blok sadece Şampiyonlar Ligi ruletini besler,
+  // hiçbir şeyi bloklamaz.
+  (async()=>{
+    let oldLbEntries=[], oldLbRank=null;
+    try{
+      oldLbEntries=await fetchLeaderboardEntries();
+      oldLbRank=rankOf(oldLbEntries,USERNAME);
+    }catch(e){ oldLbEntries=[]; oldLbRank=null; }
+
+    // İki ayrı puan yazma (bölüm ödülü + ünvan bonusu) yerine TEK Firestore
+    // yazımında birleştirildi — bir ağ gidiş-dönüşü daha az, ruleti daha çabuk açar.
+    const totalGain=(countsForProgress?GRID*10:0)+(titleChanged?50:0);
+    if(totalGain>0){
+      try{ await addScore(totalGain); }catch(e){ console.error('addScore hata:',e); }
+    }
+
+    playRankShiftAnimation(oldLbEntries, oldLbRank);
+  })();
+}
+
+let pendingRatePrompt=false;
+
+document.getElementById('nextLvlBtn').onclick=()=>{
+  winOverlay.classList.remove('show');
+  document.getElementById('titleUpBadge').classList.remove('show','titleChanged');
+  document.getElementById('rankShiftPanel').classList.remove('show');
+  if(pendingRatePrompt && shouldShowRateModal()){
+    pendingRatePrompt=false;
+    showRateModal();
+    return;
+  }
+  advanceToNextLevel();
+};
+
+function advanceToNextLevel(){
+  if(LEVEL<TOTAL_LEVELS-1){LEVEL++;loadLevel();}
+  else{statusEl.textContent=T('allDone');}
+}
+
+// ═══════════════════════════════════════════════════════
+// UYGULAMA İÇİ PUANLAMA İSTEĞİ — native In-App Review API DEĞİL (o, yeni bir
+// native build + Play Store yayını gerektirirdi). Bunun yerine hafif bir
+// JS modalı: Play Store sayfasına yönlendiriyor. Sadece ünvan atlama gibi
+// olumlu bir anda, en fazla haftada bir, ve kalıcı "bir daha sorma" seçeneğiyle.
+// ═══════════════════════════════════════════════════════
+const PLAY_STORE_URL='https://play.google.com/store/apps/details?id=com.mindgap.app';
+
+// Play Store linkini KATMANLI GÜVENLİKLE açar:
+// 1) Native köprüde yeni openExternalUrl() varsa (güncel APK) — Android'in
+//    kendi Intent sistemiyle DOĞRUDAN ve GÜVENLİ şekilde açar.
+// 2) Native köprü var ama HENÜZ ESKİ sürümse (openExternalUrl yok) —
+//    WebView içinde window.open() KULLANMAZ (Play Store'un WebView'ı fark
+//    edip "intent://" şemasına yönlendirmesi, çıplak WebView'ın bunu
+//    tanımayıp donmuş bir hata sayfasında takılı kalmasına yol açıyordu —
+//    kullanıcı uygulamayı kapatmak zorunda kalıyordu). Onun yerine linki
+//    panoya kopyalayıp kullanıcıyı bilgilendirir.
+// 3) AndroidBridge hiç yoksa (gerçek tarayıcı/PWA bağlamı) — window.open
+//    güvenlidir, orada kullanılır.
+function openPlayStore(url){
+  try{
+    if(window.AndroidBridge && typeof window.AndroidBridge.openExternalUrl==='function'){
+      window.AndroidBridge.openExternalUrl(url);
+      return;
+    }
+  }catch(e){}
+  if(window.AndroidBridge){
+    try{ navigator.clipboard && navigator.clipboard.writeText(url); }catch(e){}
+    showToast(T('rateManualFallback'));
+    return;
+  }
+  try{ window.open(url,'_blank'); }catch(e){}
+}
+
+function shouldShowRateModal(){
+  if(localStorage_get('pz_rate_never')) return false;
+  if(localStorage_get('pz_rate_done')) return false;
+  const last=parseInt(localStorage_get('pz_rate_dismissed_at')||'0');
+  if(last && (Date.now()-last) < 7*24*60*60*1000) return false; // 7 gün soğuma süresi
+  return true;
+}
+
+function showRateModal(){
+  document.getElementById('rateModalTitleTxt').textContent=T('rateModalTitle');
+  document.getElementById('rateModalMsgTxt').textContent=T('rateModalMsg');
+  document.getElementById('rateNowBtn').textContent=T('rateNowBtn');
+  document.getElementById('rateLaterBtn').textContent=T('rateLaterBtn');
+  document.getElementById('rateNeverBtn').textContent=T('rateNeverBtn');
+  document.getElementById('rateModal').classList.add('show');
+  logAnalyticsEvent('rate_prompt_shown', {});
+}
+function closeRateModal(){
+  document.getElementById('rateModal').classList.remove('show');
+  advanceToNextLevel();
+}
+document.getElementById('rateNowBtn').onclick=()=>{
+  localStorage_set('pz_rate_done','1');
+  logAnalyticsEvent('rate_prompt_clicked', {action:'rate'});
+  openPlayStore(PLAY_STORE_URL);
+  closeRateModal();
+};
+document.getElementById('rateLaterBtn').onclick=()=>{
+  localStorage_set('pz_rate_dismissed_at',String(Date.now()));
+  logAnalyticsEvent('rate_prompt_clicked', {action:'later'});
+  closeRateModal();
+};
+document.getElementById('rateNeverBtn').onclick=()=>{
+  localStorage_set('pz_rate_never','1');
+  logAnalyticsEvent('rate_prompt_clicked', {action:'never'});
+  closeRateModal();
+};
+
+// ═══════════════════════════════════════════════════════
+// SONUCUNU PAYLAŞ — Web Share API varsa native paylaşım penceresi;
+// yoksa (bazı WebView sürümleri) panoya kopyalayıp bilgilendirme gösterir.
+// ═══════════════════════════════════════════════════════
+async function shareResult(){
+  const lvl=Math.min(EARNED_LEVEL,TOTAL_LEVELS-1);
+  const text=T('shareText')
+    .replace('{title}',titleFor(lvl))
+    .replace('{iq}',String(iqFor(lvl)))
+    .replace('{level}',String(lvl));
+  try{
+    if(navigator.share){
+      await navigator.share({text:text, url:PLAY_STORE_URL});
+      logAnalyticsEvent('share_result', {method:'native'});
+    } else if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(text+' '+PLAY_STORE_URL);
+      showToast(T('shareCopied'));
+      logAnalyticsEvent('share_result', {method:'clipboard'});
+    }
+  }catch(e){
+    // Kullanıcı paylaşım penceresini iptal etti — sessizce geç, hataya düşürme.
+  }
+}
+document.getElementById('shareResultBtn').onclick=shareResult;
+
+// ═══════════════════════════════════════════════════════
+// ÇÖZÜCÜ (hedef kare bloke)
+// ═══════════════════════════════════════════════════════
+function computeSolution(){
+  const ids=Object.keys(pieces);
+  const savedState={};
+  ids.forEach(id=>{
+    const p=pieces[id];
+    savedState[id]={ori:p.ori,cells:p.cells.map(c=>[...c]),onBoard:p.onBoard,gridR:p.gridR,gridC:p.gridC};
+  });
+  // Tümünü kaldır (hesaplama için)
+  ids.forEach(id=>{lift(pieces[id]);});
+
+  const grid=Array.from({length:GRID},()=>new Array(GRID).fill(0));
+  grid[EMPTY_R][EMPTY_C]=1;
+
+  const oriMap={};
+  ids.forEach(id=>{
+    const base=pieces[id].def.cells;
+    const seen=new Set(),out=[];
+    for(let ori=0;ori<8;ori++){
+      const cc=orientCells(base,ori);
+      const key=cc.map(c=>c.join(',')).sort().join(';');
+      if(!seen.has(key)){
+        seen.add(key);
+        const s=[...cc].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+        const[ar,ac]=s[0];
+        out.push({ori,offs:s.map(([r,c])=>[r-ar,c-ac])});
+      }
+    }
+    oriMap[id]=out;
+  });
+
+  const used={},sol={};
+  function bt(n){
+    if(n===ids.length) return true;
+    let fr=-1,fc=-1;
+    outer:
+    for(let r=0;r<GRID;r++)for(let c=0;c<GRID;c++){
+      if(grid[r][c]===0){fr=r;fc=c;break outer;}
+    }
+    if(fr<0) return false;
+    for(const id of ids){
+      if(used[id]) continue;
+      for(const{ori,offs}of oriMap[id]){
+        let ok=true;
+        for(const[dr,dc]of offs){
+          const nr=fr+dr,nc=fc+dc;
+          if(nr<0||nr>=GRID||nc<0||nc>=GRID||grid[nr][nc]!==0){ok=false;break;}
+        }
+        if(!ok) continue;
+        offs.forEach(([dr,dc])=>{grid[fr+dr][fc+dc]=1;});
+        used[id]=true;
+        sol[id]={ori,anchor:[fr,fc],offs};
+        if(bt(n+1)) return true;
+        used[id]=false;delete sol[id];
+        offs.forEach(([dr,dc])=>{grid[fr+dr][fc+dc]=0;});
+      }
+    }
+    return false;
+  }
+  const found=bt(0);
+
+  // Hesaplama sırasında bozulan state'i geri yükle (henüz uygulanmadı)
+  ids.forEach(id=>{
+    const p=pieces[id];
+    const s=savedState[id];
+    lift(p);
+    p.ori=s.ori;p.cells=s.cells;
+    if(s.onBoard) place(p,s.gridR,s.gridC);
+  });
+
+  if(!found) return null;
+
+  // Çözüm konumlarını { id -> {gridR,gridC,ori,cells} } formatına çevir
+  const result={};
+  ids.forEach(id=>{
+    const p=pieces[id];
+    const s=sol[id];
+    const cells=orientCells(p.def.cells,s.ori);
+    const sorted=[...cells].sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    const[ar,ac]=sorted[0];
+    result[id]={ori:s.ori,cells,gridR:s.anchor[0]-ar,gridC:s.anchor[1]-ac};
+  });
+  return result;
+}
+
+function solveAll(){
+  const sol=computeSolution();
+  if(!sol) return false;
+  // ÖNEMLİ: önce TÜM parçaları eski (mevcut) şekilleriyle tahtadan kaldır,
+  // SONRA yeni çözüm şekline geçir. Sırayı tersine çevirmek (önce cells'i
+  // değiştirip sonra kaldırmaya çalışmak) yanlış anahtarlarla silme yapıp
+  // tahtada "hayalet" kayıtlar bırakıyordu — bu da bazen iki parçanın aynı
+  // hücrede üst üste görünmesine ya da bir hücrenin yanlışlıkla dolu/boş
+  // sayılmasına yol açıyordu.
+  Object.values(pieces).forEach(p=>{ if(p.onBoard) lift(p); });
+  Object.keys(sol).forEach(id=>{
+    const p=pieces[id];
+    const s=sol[id];
+    p.ori=s.ori;
+    p.cells=s.cells;
+    place(p,s.gridR,s.gridC);
+  });
+  return true;
+}
+
+// Reklam sonrası: parçaları tek tek animasyonla yerleştir
+function solveWithAnimation(onComplete){
+  const sol=computeSolution();
+  if(!sol){ if(onComplete) onComplete(false); return; }
+
+  // Önce tahtadaki tüm parçaları tepsiye al (hepsi _box'a sahip olsun)
+  Object.values(pieces).forEach(p=>{ if(p.onBoard) lift(p); });
+  renderPlaced();
+  buildTray();
+
+  const ids=Object.keys(sol);
+  let i=0;
+
+  function placeNext(){
+    if(i>=ids.length){
+      renderPlaced();buildTray();
+      if(onComplete) onComplete(true);
+      return;
+    }
+    const id=ids[i];
+    const p=pieces[id];
+    const s=sol[id];
+
+    // Parça hâlâ tepsideyse önce sürükleme animasyonuyla tahtaya "uçur"
+    animatePieceToBoard(p, s, ()=>{
+      p.ori=s.ori;
+      p.cells=s.cells;
+      place(p,s.gridR,s.gridC);
+      renderPlaced();buildTray();
+      i++;
+      setTimeout(placeNext, 220);
+    });
+  }
+  placeNext();
+}
+
+// Bir parçayı tepsiden tahtadaki hedef konuma kısa bir animasyonla taşı
+function animatePieceToBoard(p, sol, done){
+  const box=p._box;
+  if(!box){ done(); return; }
+  const boxRect=box.getBoundingClientRect();
+  const boardRect=boardEl.getBoundingClientRect();
+
+  const cells=sol.cells;
+  const bb=bbOf(cells);
+  const targetX=boardRect.left + sol.gridC*CS + (bb.cols*CS)/2;
+  const targetY=boardRect.top  + sol.gridR*CS + (bb.rows*CS)/2;
+  const startX=boxRect.left + boxRect.width/2;
+  const startY=boxRect.top + boxRect.height/2;
+
+  box.style.transition='none';
+  box.style.opacity='0'; // orijinal kutuyu gizle, uçan kopyayı göster
+
+  const flyLayer=document.createElement('div');
+  flyLayer.style.cssText=`position:fixed;left:0;top:0;pointer-events:none;z-index:10003;
+    transform:translate(${startX}px,${startY}px);transition:transform .32s cubic-bezier(.34,1.56,.64,1),opacity .3s`;
+  const cvs=document.createElement('canvas');
+  cvs.width=bb.cols*CS; cvs.height=bb.rows*CS;
+  cvs.style.cssText=`display:block;transform:translate(-50%,-50%)`;
+  drawCells(cvs.getContext('2d'), cells, CS, p.def.color, p.def.dark);
+  flyLayer.appendChild(cvs);
+  document.body.appendChild(flyLayer);
+
+  // Bir sonraki frame'de hedefe hareket ettir (transition tetiklensin)
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      flyLayer.style.transform=`translate(${targetX}px,${targetY}px) scale(1.06)`;
+    });
+  });
+
+  setTimeout(()=>{
+    flyLayer.style.opacity='0';
+    setTimeout(()=>{
+      flyLayer.remove();
+      done();
+    },140);
+  },320);
+}
+
+// ═══════════════════════════════════════════════════════
+// PUAN SİSTEMİ
+// ═══════════════════════════════════════════════════════
+let SCORE=parseInt(localStorage_get('pz_score')||'0')||0;
+let BONUS_HINTS=parseInt(localStorage_get('pz_bonushints')||'0')||0;
+let levelsSinceBonus=parseInt(localStorage_get('pz_levelssincebonus')||'0')||0;
+
+// Tamamlanmış bölüm takibi — tekrar puan kazanmayı önler
+const COMPLETED_LEVELS=new Set(
+  (localStorage_get('pz_completed')||'').split(',').filter(x=>x!=='').map(Number)
+);
+let CURRENT_LEVEL_ALREADY_COMPLETED=false; // bu bölüm daha önce bitirilmiş mi
+
+function markLevelCompleted(levelIdx){
+  if(COMPLETED_LEVELS.has(levelIdx)) return false; // zaten işaretliydi
+  COMPLETED_LEVELS.add(levelIdx);
+  localStorage_set('pz_completed', Array.from(COMPLETED_LEVELS).join(','));
+  return true; // ilk kez tamamlandı
+}
+
+function addScoreIfFirstTime(pts){
+  if(CURRENT_LEVEL_ALREADY_COMPLETED) return; // daha önce çözülmüş bölüm — puan yok
+  addScore(pts);
+}
+
+async function addScore(pts){
+  SCORE+=pts;
+  localStorage_set('pz_score',String(SCORE));
+  updateScoreBadge();
+  await saveScore();
+}
+
+function updateScoreBadge(){
+  const el=document.getElementById('scoreBadge');
+  if(el) el.textContent=`⭐ ${SCORE}`;
+}
+
+function grantBonusHintIfDue(){
+  levelsSinceBonus++;
+  if(levelsSinceBonus>=3){ // her 3 bölümde bir bonus ipucu
+    levelsSinceBonus=0;
+    BONUS_HINTS++;
+    localStorage_set('pz_bonushints',String(BONUS_HINTS));
+    return true;
+  }
+  localStorage_set('pz_levelssincebonus',String(levelsSinceBonus));
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════
+// GÜNLÜK SERİ (STREAK) — her gün en az 1 bölüm çözünce artar,
+// bir gün atlanırsa sıfırlanır. Tamamen cihaz-yerel, offline'da da çalışır.
+// ═══════════════════════════════════════════════════════
+function todayKey(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function daysBetween(a,b){
+  const da=new Date(a+'T00:00:00'), db=new Date(b+'T00:00:00');
+  return Math.round((db-da)/86400000);
+}
+let STREAK_COUNT=parseInt(localStorage_get('pz_streak')||'0')||0;
+let STREAK_LAST=localStorage_get('pz_streak_last')||'';
+
+// Bir bölüm gerçekten ilk kez çözüldüğünde çağrılır (isFirstTime true iken).
+function registerStreakProgress(){
+  const today=todayKey();
+  if(STREAK_LAST===today){
+    return; // bugün zaten sayıldı, tekrar artırma
+  }
+  if(STREAK_LAST===''){
+    STREAK_COUNT=1; // ilk gün
+  } else {
+    const gap=daysBetween(STREAK_LAST,today);
+    if(gap===1){
+      STREAK_COUNT++; // dün oynanmış, seri devam ediyor
+    } else if(gap>1){
+      STREAK_COUNT=1; // en az bir gün atlanmış, seriden başla
+    }
+    // gap===0 zaten yukarıda ele alındı; negatif gap (saat farkı vs.) göz ardı edilir
+  }
+  STREAK_LAST=today;
+  localStorage_set('pz_streak',String(STREAK_COUNT));
+  localStorage_set('pz_streak_last',STREAK_LAST);
+  updateStreakUI();
+}
+
+// Sayfa her açıldığında seri hâlâ geçerli mi kontrol et (2+ gün atlanmışsa göstergeyi sıfırla)
+function checkStreakValidity(){
+  if(!STREAK_LAST) return;
+  const gap=daysBetween(STREAK_LAST,todayKey());
+  if(gap>1){
+    STREAK_COUNT=0;
+    localStorage_set('pz_streak','0');
+    updateStreakUI();
+  }
+}
+
+function updateStreakUI(){
+  const row=document.getElementById('streakRow');
+  if(!row) return;
+  if(STREAK_COUNT>=2){
+    row.classList.add('show');
+    row.innerHTML=`🔥 ${STREAK_COUNT} ${T('streakDays')}`;
+  } else {
+    row.classList.remove('show');
+    row.innerHTML='';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BUTONLAR
+// ═══════════════════════════════════════════════════════
+document.getElementById('resetBtn').onclick=()=>{loadLevel();};
+
+let hintUsed=0; // bu bölümde kullanılan ipucu sayısı
+
+document.getElementById('hintBtn').onclick=()=>{
+  // Bölüm başına temel ipucu: 5×5→1, 6×6→2, 7×7→3, 8×8→4, 9×9→5
+  // (+ kazanılan bonus ipuçları ve reklam izleyerek kazanılan ipuçları, ikisi de BONUS_HINTS havuzunda).
+  const baseHints=GRID===5?1:GRID===6?2:GRID===7?3:GRID===8?4:5;
+  const hintLimit=baseHints+BONUS_HINTS;
+  const usingBonus=hintUsed>=baseHints;
+  if(hintUsed>=hintLimit){
+    showToast(T('hintOver')+' ('+hintLimit+'/'+hintLimit+')');
+    return;
+  }
+
+  const before={};
+  Object.values(pieces).forEach(p=>{
+    before[p.id]={onBoard:p.onBoard,ori:p.ori,r:p.gridR,c:p.gridC,cells:p.cells.map(x=>[...x])};
+  });
+  if(solveAll()){
+    // Her basışta SADECE 1 parça yerleştir
+    const target=Object.values(pieces).find(p=>!before[p.id].onBoard);
+    // 1. adım: hedef dışındaki TÜM parçaları önce tahtadan kaldır (çözüm
+    // konumlarından). Bunu tek tek "kaldır sonra hemen geri koy" şeklinde
+    // yapmak, henüz sırası gelmemiş bir parçanın çözüm-konumunun, geri
+    // yüklenmeye çalışılan başka bir parçayı yanlışlıkla "dolu" göstermesine
+    // (ve bu yüzden o parçanın tahtadan düşüp kaybolmasına) yol açıyordu.
+    Object.values(pieces).forEach(p=>{
+      if(target&&p.id===target.id) return;
+      lift(p);
+    });
+    // 2. adım: şimdi hepsini güvenle eski (bulmaca öncesi) konum/şekline döndür.
+    Object.values(pieces).forEach(p=>{
+      if(target&&p.id===target.id) return;
+      const b=before[p.id];
+      p.ori=b.ori;p.cells=b.cells;
+      if(b.onBoard&&canPlace(p.cells,b.r,b.c,p.id)) place(p,b.r,b.c);
+    });
+    renderPlaced();buildTray();checkWin().catch(e=>console.error('checkWin hata (drag):',e));
+    if(target){
+      hintUsed++;
+      if(usingBonus){
+        BONUS_HINTS=Math.max(0,BONUS_HINTS-1);
+        localStorage_set('pz_bonushints',String(BONUS_HINTS));
+      }
+      showToast(T('hintUsedT')+' '+hintUsed+'/'+hintLimit);
+      SFX.hint();
+      pulseHintHighlight(target.cells,target.gridR,target.gridC);
+      if(typeof LEVEL1_GUIDE_ACTIVE!=='undefined' && LEVEL1_GUIDE_ACTIVE){
+        advanceLevel1Guide();
+      }
+    }
+  } else {
+    statusEl.textContent='Bu düzenden çözüme gidilemiyor — Sıfırla ile temiz başla';
+    Object.values(pieces).forEach(p=>{
+      const b=before[p.id];
+      lift(p);p.ori=b.ori;p.cells=b.cells;
+      if(b.onBoard) place(p,b.r,b.c);
+    });
+    renderPlaced();buildTray();
+  }
+};
+
+// ── ÖDÜLLÜ REKLAM ──
+// Native (Android/WebView) tarafında window.AndroidBridge köprüsü varsa
+// gerçek AdMob ödüllü reklamı gösterilir. Köprü yoksa (tarayıcıda test
+// ederken, PWA modunda vs.) eski sahte simülasyon devrededir.
+const ADS=[
+  {emoji:'🎮',title:'Süper Blok Macerası!',desc:'Milyonlarca oyuncuya katıl, en yüksek skoru sen yap!',bg:'linear-gradient(160deg,#ff6b35,#e8336d 55%,#7b2ff7)'},
+  {emoji:'🍔',title:'Lezzet Ekspresi',desc:'İlk siparişine %50 indirim! Hemen indir.',bg:'linear-gradient(160deg,#ffb100,#ff5e00 60%,#c62b00)'},
+  {emoji:'🚀',title:'Uzay Savaşları X',desc:'Galaksiyi kurtar! Yeni sezon başladı.',bg:'linear-gradient(160deg,#2b32b2,#1488cc 60%,#00d2ff)'},
+  {emoji:'💎',title:'Mücevher Patlat',desc:'3.000+ bölüm seni bekliyor. Ücretsiz oyna!',bg:'linear-gradient(160deg,#11998e,#38ef7d)'},
+  {emoji:'🏰',title:'Krallık Kur',desc:'İmparatorluğunu inşa et, dünyayı yönet!',bg:'linear-gradient(160deg,#4a00e0,#8e2de2)'},
+];
+let adInterval=null;
+let adInProgress=false;
+let adSessionActive=false;   // 10 saniyelik yeniden deneme penceresi aktif mi
+let adAlreadyHandled=false;  // bu tur için sonuç (ödül ya da zaman aşımı) belirlendi mi
+let adRetryTimer=null, adCountdownTimer=null, adTimeoutTimer=null;
+
+function endAdSession(){
+  adSessionActive=false;
+  adInProgress=false;
+  clearInterval(adRetryTimer); adRetryTimer=null;
+  clearInterval(adCountdownTimer); adCountdownTimer=null;
+  clearTimeout(adTimeoutTimer); adTimeoutTimer=null;
+  const badge=document.getElementById('adCountdownBadge');
+  if(badge) badge.style.display='none';
+}
+
+// Reklam GERÇEKTEN izlenip ödül kazanıldığında çağrılır: kalıcı ipucu havuzuna
+// (BONUS_HINTS) +1 ekler. Bölümü çözmez — oyuncu bölümü kendisi çözer, ilerleme/puan/IQ
+// normal şekilde işler. Ödül kazanıldığı için, oyuncu o sırada başka bölüme geçmiş
+// olsa bile verilir.
+function grantAdHint(){
+  BONUS_HINTS++;
+  localStorage_set('pz_bonushints',String(BONUS_HINTS));
+  logAnalyticsEvent('watch_rewarded_ad', {level_name: String(LEVEL+1), completed: 1, reward: 'hint'});
+  showToast(T('adHintEarned'),2400);
+  SFX.hint();
+}
+
+function hasNativeAdBridge(){
+  return !!(window.AndroidBridge && typeof window.AndroidBridge.showRewardedAd==='function');
+}
+
+document.getElementById('solveBtn').onclick=()=>{
+  if(adInProgress) return;
+
+  if(hasNativeAdBridge()){
+    // Gerçek AdMob ödüllü reklamı — 10 saniye boyunca reklamı tekrar tekrar
+    // dener; bu süre içinde reklam gelirse gösterilir, gelmezse süre dolunca
+    // "reklam yok, tekrar dene" denir (ipucu verilmez).
+    if(adSessionActive) return;
+    adSessionActive=true;
+    adAlreadyHandled=false;
+    adInProgress=true;
+
+    let secondsLeft=10;
+    const badge=document.getElementById('adCountdownBadge');
+    badge.style.display='inline-flex';
+    badge.textContent='⏳ '+secondsLeft+'s';
+
+    const attempt=()=>{
+      try{ window.AndroidBridge.showRewardedAd(); }catch(e){}
+    };
+    attempt();
+    adRetryTimer=setInterval(attempt, 2000);
+
+    adCountdownTimer=setInterval(()=>{
+      secondsLeft--;
+      if(badge) badge.textContent='⏳ '+Math.max(secondsLeft,0)+'s';
+    },1000);
+
+    adTimeoutTimer=setTimeout(()=>{
+      if(adAlreadyHandled) return;
+      adAlreadyHandled=true;
+      endAdSession();
+      showToast(T('adTimeoutFallback')+(lastAdDebugMsg?' — '+lastAdDebugMsg:''),4000);
+    }, 10000);
+
+    return;
+  }
+
+  // Native köprü yok (tarayıcı/PWA testi) — sahte reklam simülasyonu.
+  const ad=ADS[Math.floor(Math.random()*ADS.length)];
+  document.getElementById('adEmoji').textContent=ad.emoji;
+  document.getElementById('adTitle').textContent=ad.title;
+  document.getElementById('adDesc').textContent=ad.desc;
+  document.getElementById('adBox').style.background=ad.bg;
+
+  const overlay=document.getElementById('adOverlay');
+  const timerEl=document.getElementById('adTimer');
+  const closeBtn=document.getElementById('adCloseBtn');
+  overlay.classList.add('show');
+  closeBtn.classList.remove('show');
+
+  let sec=5;
+  timerEl.textContent=T('adWait')+' '+sec+' sn...';
+  clearInterval(adInterval);
+  adInterval=setInterval(()=>{
+    sec--;
+    if(sec>0){
+      timerEl.textContent=T('adWait')+' '+sec+' sn...';
+    } else {
+      clearInterval(adInterval);
+      timerEl.textContent=T('adDone');
+      closeBtn.classList.add('show');
+    }
+  },1000);
+};
+
+// Native (Android) taraftan reklam bittiğinde çağrılan global callback'ler.
+// MainActivity.java bunları webView.evaluateJavascript(...) ile tetikler.
+let lastAdDebugMsg='';
+
+// Native taraftaki OnPaidEventListener'dan gelir — reklam GERÇEKTEN para
+// kazandığı an tetiklenir (gösterim başına gerçek gelir). Google Ads'te
+// "Dönüşüm değerini en üst düzeye çıkar" teklif stratejisinin ihtiyaç
+// duyduğu 'ad_revenue' olayını burada Firebase Analytics'e (zaten çalışan
+// web katmanı üzerinden) kaydediyoruz — native Firebase SDK/config dosyası
+// eklemeye gerek kalmadan.
+window.onAdPaidEvent=function(value, currencyCode, adUnitId){
+  logAnalyticsEvent('ad_revenue', {
+    value: value,
+    currency: currencyCode || 'USD',
+    ad_platform: 'AdMob',
+    ad_source: 'AdMob Network',
+    ad_unit_name: adUnitId || ''
+  });
+};
+
+window.onRewardedAdShowing=function(){
+  // Reklam artık GERÇEKTEN ekranda — 2 saniyede bir tekrar deneyen döngüyü
+  // ve 10 saniyelik "vazgeç" zaman aşımını DURDUR. Aksi hâlde:
+  // (a) döngü showRewardedAd()'ı tekrar çağırıp İKİNCİ bir reklamı kuyruğa
+  //     sokabilir ("2 reklam çıkıyor" hatası),
+  // (b) 10sn'lik zaman aşımı, kullanıcı reklamı hâlâ izlerken (video genelde
+  //     10sn'den uzun sürer) devreye girip erken/hatalı "zaman aşımı" sonucu
+  //     üretebilirdi.
+  // Ödül/kapanış sonucu artık tamamen native'in onRewardEarned / onAdFailed
+  // çağrılarına bırakılıyor — reklam kendi doğal süresinde bitene kadar beklenir.
+  clearInterval(adRetryTimer); adRetryTimer=null;
+  clearTimeout(adTimeoutTimer); adTimeoutTimer=null;
+  clearInterval(adCountdownTimer); adCountdownTimer=null;
+  const badge=document.getElementById('adCountdownBadge');
+  if(badge) badge.style.display='none';
+};
+window.onRewardEarned=function(){
+  // Ödül kazanıldı = reklam gerçekten izlendi → ipucu HER ZAMAN verilir
+  // (zaman aşımı sınırında geç gelen ödül dahil). Çift verilmez: native her
+  // reklam için bu callback'i yalnızca bir kez çağırır.
+  adAlreadyHandled=true;
+  endAdSession();
+  grantAdHint();
+};
+window.onRewardedAdClosedWithoutReward=function(){
+  // Kullanıcı reklamı ödül kazanmadan erken kapattı. onRewardedAdShowing zaten
+  // 10sn'lik zaman aşımını iptal ettiği için, burada oturumu KENDİMİZ
+  // sonlandırmazsak reklam butonu sonsuza kadar kilitli kalır.
+  if(adAlreadyHandled){ endAdSession(); return; }
+  adAlreadyHandled=true;
+  endAdSession();
+  showToast(T('adClosedNoReward'),3000);
+};
+window.onRewardedAdFailed=function(msg){
+  if(msg) lastAdDebugMsg=msg;
+  if(!adSessionActive){ adInProgress=false; showToast(T('adFailed')+(msg?' ('+msg+')':'')); }
+  // adSessionActive true ise: 10 saniyelik deneme döngüsü zaten devam ediyor,
+  // her başarısız denemede ayrı bir uyarı göstermiyoruz.
+};
+window.onRewardedAdNotReady=function(msg){
+  if(msg) lastAdDebugMsg=msg;
+  if(!adSessionActive){ adInProgress=false; showToast(T('adNotReady')+(msg?' ('+msg+')':'')); }
+};
+
+document.getElementById('adCloseBtn').onclick=()=>{
+  document.getElementById('adOverlay').classList.remove('show');
+  grantAdHint();
+};
+
+document.getElementById('prevBtn').onclick=()=>{
+  if(LEVEL>0){LEVEL--;loadLevel();}
+};
+document.getElementById('nextBtn').onclick=()=>{
+  // Sadece daha önce çözülmüş / açılmış bölümlere ilerlenebilir
+  if(LEVEL<MAX_LEVEL && LEVEL<TOTAL_LEVELS-1){LEVEL++;loadLevel();}
+};
+
+// ═══════════════════════════════════════════════════════
+// BÖLÜM YÜKLEME
+// ═══════════════════════════════════════════════════════
+function loadLevel(){
+  endAdSession(); // önceki bölümden kalan reklam deneme/zaman aşımı sayaçları yeni bölüme sızmasın.
+  tutorialInteractive=false; // güvenlik ağı: interaktif Bölüm 0 asla gerçek bir bölümün
+                              // kazanma kontrolünü (checkWin) sessizce engellemesin.
+  const info=levelInfo(LEVEL);
+  GRID=info.grid;EMPTY_R=info.emptyR;EMPTY_C=info.emptyC;CELL_NUM=info.cellNum;
+  CURRENT_SHAPE_SET=shapeSetFor(GRID, info.local);
+  logAnalyticsEvent('level_start', {level_name: String(LEVEL+1)});
+
+  // State sıfırla
+  Object.keys(pieces).forEach(k=>delete pieces[k]);
+  Object.keys(boardMap).forEach(k=>delete boardMap[k]);
+
+  CURRENT_SHAPE_SET.forEach((shapeName,i)=>{
+    const def=SHAPES[shapeName];
+    const id=shapeName+'_'+i;
+    pieces[id]={
+      id, def,
+      ori:0,
+      cells:def.cells.map(c=>[...c]),
+      onBoard:false,gridR:-1,gridC:-1,
+      _box:null,_cellSz:0
+    };
+  });
+
+  hintUsed=0;
+  CURRENT_LEVEL_ALREADY_COMPLETED=COMPLETED_LEVELS.has(LEVEL);
+  const iq=iqFor(EARNED_LEVEL);
+  document.getElementById('iqBadge').textContent=`🧠 IQ: ${iq}`;
+  if(typeof updateUserTag==='function'&&USERNAME){updateUserTag();saveScore();}
+  if(typeof refreshLevelTexts==='function'){refreshLevelTexts();}
+  else{lvlBadge.textContent=`🎯 ${LEVEL+1}/${TOTAL_LEVELS}`;}
+  statusEl.textContent='';
+  winOverlay.classList.remove('show');
+  document.getElementById('titleUpBadge').classList.remove('show','titleChanged');
+  document.getElementById('rankShiftPanel').classList.remove('show');
+  localStorage_set('pz_level',String(LEVEL));
+
+  document.getElementById('prevBtn').disabled = LEVEL<=0;
+  document.getElementById('nextBtn').disabled = LEVEL>=MAX_LEVEL || LEVEL>=TOTAL_LEVELS-1;
+
+  setupLayout();
+  drawGrid();
+  renderPlaced();
+  buildTray();
+
+  // Bölüm 1'i (GERÇEK ilk bölüm) ilk kez oynayan oyuncuya rehberli oynatıyoruz:
+  // önce İpucu'na basmaya yönlendiriyoruz, sonra kalan parçaları kendisinin
+  // sürükleyip yerleştirmesini adım adım işaretleyerek istiyoruz. Sadece
+  // GERÇEKTEN yeni oyuncularda tetiklenir (EARNED_LEVEL===0) ve sadece bir
+  // kez — daha önce görmüş/tamamlamış oyuncular tekrar karşılaşmaz.
+  // ÖNEMLİ: !isNewPlayerDemoNeeded() şartı da eklendi — aksi hâlde bu
+  // fonksiyonun komut dosyasının en altında koşulsuz çalışan İLK
+  // çağrısında (demo henüz playIntroDemo() ile başlamadan, demoActive
+  // hâlâ false iken) rehber yanlışlıkla tetiklenip, az sonra başlayan
+  // demo ekranıyla üst üste biniyordu.
+  if(LEVEL===0 && EARNED_LEVEL===0 && !localStorage_get('pz_level1_guided_done')
+     && !isNewPlayerDemoNeeded()
+     && !(typeof demoActive!=='undefined' && demoActive)
+     && !(typeof tutorialInteractive!=='undefined' && tutorialInteractive)){
+    startLevel1Guide();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BÖLÜM 0 — SADECE İZLENEN TANITIM ANİMASYONU
+// (4×4 tahta, 3 parça, otomatik sürükle-bırak gösterimi)
+// Sadece yeni oyuncu ilk kez oyuna girdiğinde çalışır.
+// ═══════════════════════════════════════════════════════
+const DEMO_GRID=4;
+const DEMO_EMPTY_R=3, DEMO_EMPTY_C=3;
+const DEMO_PIECES=[
+  {id:'L5', def:SHAPES.L5, targetR:0, targetC:0, ori:0},
+  {id:'P5', def:SHAPES.P5, targetR:0, targetC:2, ori:2},
+  {id:'T5', def:SHAPES.T5, targetR:1, targetC:0, ori:2},
+];
+
+let demoActive=false, demoCancelled=false;
+
+function isNewPlayerDemoNeeded(){
+  return !localStorage_get('pz_demo_done');
+}
+
+function markDemoDone(){
+  localStorage_set('pz_demo_done','1');
+}
+
+async function playIntroDemo(){
+  if(demoActive) return;
+  demoActive=true; demoCancelled=false;
+
+  // Demo tahtasını kur (gerçek oyun state'ini geçici olarak demo moduna al)
+  GRID=DEMO_GRID; EMPTY_R=DEMO_EMPTY_R; EMPTY_C=DEMO_EMPTY_C;
+  Object.keys(pieces).forEach(k=>delete pieces[k]);
+  Object.keys(boardMap).forEach(k=>delete boardMap[k]);
+
+  DEMO_PIECES.forEach(dp=>{
+    pieces[dp.id]={
+      id:dp.id, def:dp.def, ori:0,
+      cells:dp.def.cells.map(c=>[...c]),
+      onBoard:false, gridR:-1, gridC:-1,
+      _box:null, _cellSz:0
+    };
+  });
+
+  lvlBadge.textContent='🎓 '+T('demoTitle');
+  subTxt.textContent=T('demoSub');
+  statusEl.textContent='';
+
+  // Etkileşimi kapat: footer + tepsi tıklanamaz, sadece skip görünür
+  setFooterEnabled(false);
+  document.getElementById('demoSkipWrap').classList.add('show');
+  document.getElementById('demoSkipTxt').textContent=T('skipTutorial');
+
+  setupLayout();
+  drawGrid();
+  renderPlaced();
+  buildTray();
+
+  const banner=document.getElementById('demoBanner');
+  const cursor=document.getElementById('demoCursor');
+  banner.classList.add('show');
+  cursor.classList.add('show');
+
+  banner.textContent=T('demoWelcome');
+  await demoWait(1400);
+
+  for(const dp of DEMO_PIECES){
+    if(demoCancelled) break;
+    const p=pieces[dp.id];
+    banner.textContent=T('demoDrag');
+    await demoDragPiece(p, dp.targetR, dp.targetC, dp.ori);
+    if(demoCancelled) break;
+    await demoWait(260);
+  }
+
+  if(demoCancelled){
+    finishIntroDemo();
+    return;
+  }
+
+  banner.textContent=T('demoComplete');
+  await demoWait(1100);
+  banner.classList.remove('show');
+  cursor.classList.remove('show');
+
+  // Bölüm 0 (interaktif 2×2 mini-bulmaca) KALDIRILDI — artık gereksiz,
+  // çünkü GERÇEK Bölüm 1'in kendi kapsamlı rehberi var (İpucu yönlendirmesi
+  // + döndürme/sürükleme adım adım işaretleme). İzlenen tanıtım demosu
+  // bitince doğrudan gerçek Bölüm 1'e geçiliyor.
+  finishIntroDemo();
+}
+
+function demoWait(ms){
+  return new Promise(res=>{
+    const t=setTimeout(res,ms);
+    demoWait._cancelFns=demoWait._cancelFns||[];
+    demoWait._cancelFns.push(()=>{clearTimeout(t);res();});
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// BÖLÜM 0 (devamı) — GERÇEK İNTERAKTİF MİNİ-BULMACA
+// İzlenen demo bittikten sonra çalışır: 2×2'lik gerçek bir tahtada,
+// oyuncu TEK bir L-parçasını KENDİSİ döndürüp KENDİSİ sürükleyerek
+// yerleştirir. Aynı motor (canPlace/place/checkWin) kullanılır — özel
+// bir doğrulama kodu yazmaya gerek yok, tahtanın boyutu parçanın
+// bounding-box'ıyla birebir aynı olduğu için tek doğru yönelim/konum var.
+// ═══════════════════════════════════════════════════════
+// Bölüm 0 (interaktif 2×2 mini-bulmaca) KALDIRILDI — artık gereksiz,
+// gerçek Bölüm 1'in kendi kapsamlı rehberi bu işlevi üstleniyor.
+// Bayrak, başka yerlerdeki güvenlik kontrolleri için hâlâ mevcut ama
+// artık hiçbir zaman true olmuyor.
+let tutorialInteractive=false;
+
+// Tanıtım/rehber mesaj kutusu (#tutMsg) HER ZAMAN bu fonksiyon üzerinden
+// güncellenmeli — doğrudan .textContent atamak YERİNE. Gösterilen i18n
+// anahtarını hatırlar, böylece kullanıcı tanıtım/rehber SÜRERKEN dili
+// değiştirirse (applyLang() içinde) mesaj doğru dile yeniden çevrilir.
+let CURRENT_TUT_MSG_KEY=null;
+function setTutMsg(key){
+  CURRENT_TUT_MSG_KEY=key;
+  const el=document.getElementById('tutMsg');
+  if(el) el.textContent=T(key);
+}
+
+// ═══════════════════════════════════════════════════════
+// BÖLÜM 1 REHBERİ — GERÇEK ilk bölümü, oyuncunun KENDİSİNE oynatıyoruz.
+// 1. adım: "İpucu" butonuna basmaya yönlendiriliyor (ilk parça otomatik yerleşir).
+// 2. adım: kalan her parça için — gerekiyorsa önce DÖNDÜRME (el işareti
+//    parçanın üstünde yanıp söner), sonra SÜRÜKLEME (el işareti hareketli
+//    "yaklaş-uzaklaş" animasyonuyla dururken, tahtada hedef hücreler kesikli
+//    neon çizgilerle işaretlenir). Oyuncu her adımı KENDİSİ yapar, biz
+//    otomatik oynatmıyoruz — sadece işaret ediyoruz.
+// Sadece gerçekten yeni oyuncularda ve sadece bir kez tetiklenir.
+// ═══════════════════════════════════════════════════════
+let LEVEL1_GUIDE_ACTIVE=false;
+let LEVEL1_GUIDE_PIECE_ID=null;
+let LEVEL1_GUIDE_PHASE=null; // 'rotate' | 'drag'
+let LEVEL1_GUIDE_TARGET=null; // computeSolution()'dan o parçaya ait {ori,cells,gridR,gridC}
+
+function startLevel1Guide(){
+  LEVEL1_GUIDE_ACTIVE=true;
+  LEVEL1_GUIDE_PIECE_ID=null;
+  LEVEL1_GUIDE_PHASE=null;
+  LEVEL1_GUIDE_TARGET=null;
+
+  // Sadece İpucu etkin kalsın; oyuncu odağı dağılmasın.
+  ['homeBtn','prevBtn','nextBtn','resetBtn','solveBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=true;
+  });
+  const hintBtn=document.getElementById('hintBtn');
+  if(hintBtn) hintBtn.disabled=false;
+
+  const hand=document.getElementById('tutHand');
+  hand.classList.remove('pokeAnim','blinkAnim');
+  hand.classList.add('blinkAnim'); // buton için de yanıp sönerek dikkat çeksin
+
+  const msg=document.getElementById('tutMsg');
+  setTutMsg('level1GuideHint');
+  msg.classList.add('show');
+  positionTutHandOnEl(hintBtn);
+}
+
+// Bir DOM elementinin (buton, parça kutusu vb.) üzerine el işaretini/talimatı konumlar.
+function positionTutHandOnEl(el){
+  const hand=document.getElementById('tutHand');
+  if(!el){ hand.classList.remove('show'); return; }
+  const r=el.getBoundingClientRect();
+  hand.style.left=(r.left+r.width/2)+'px';
+  hand.style.top=(r.top+r.height/2)+'px';
+  hand.classList.add('show');
+}
+
+// Hedef parçanın (LEVEL1_GUIDE_TARGET) tahtadaki yerini kesikli neon
+// hücrelerle çizer. Canvas değil, ayrı bir DOM katmanı kullanıyoruz —
+// böylece sürükleme sırasında canvas'a çizilen "hayalet parça" ile
+// hiç çakışmıyor/kapışmıyor.
+function drawLevel1GuideTargetOutline(target){
+  const container=document.getElementById('level1GuideOutline');
+  container.innerHTML='';
+  if(!target) return;
+  const br=boardEl.getBoundingClientRect();
+  target.cells.forEach(([dr,dc])=>{
+    const r=target.gridR+dr, c=target.gridC+dc;
+    const div=document.createElement('div');
+    div.className='guideCell';
+    div.style.left=(br.left+c*CS+2)+'px';
+    div.style.top=(br.top+r*CS+2)+'px';
+    div.style.width=(CS-4)+'px';
+    div.style.height=(CS-4)+'px';
+    container.appendChild(div);
+  });
+}
+function clearLevel1GuideTargetOutline(){
+  const container=document.getElementById('level1GuideOutline');
+  if(container) container.innerHTML='';
+}
+
+// Bir parçanın normalize edilmiş hücre şeklini (dönüşten bağımsız
+// karşılaştırma için) anahtar string'e çevirir.
+function guideCellsKey(cells){
+  return [...cells].sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(c=>c.join(',')).join(';');
+}
+
+// buildTray() her yeniden çizimde çağırır — rehberdeki hedef parçanın
+// konumu (kalan parça sayısı azaldıkça tepsi yeniden boyutlanır) güncel tutulur.
+function updateLevel1GuidePointer(){
+  if(!LEVEL1_GUIDE_ACTIVE || !LEVEL1_GUIDE_PIECE_ID) return;
+  Object.values(pieces).forEach(p=>{
+    if(p._box) p._box.classList.toggle('guideTarget', p.id===LEVEL1_GUIDE_PIECE_ID && !p.onBoard);
+  });
+  const p=pieces[LEVEL1_GUIDE_PIECE_ID];
+  if(!p || p.onBoard || !p._box){ return; }
+  positionTutHandOnEl(p._box);
+  if(LEVEL1_GUIDE_PHASE==='drag' && LEVEL1_GUIDE_TARGET){
+    drawLevel1GuideTargetOutline(LEVEL1_GUIDE_TARGET);
+  }
+}
+
+// İpucu ile bir parça yerleşince VEYA rehberdeki hedef parça sürüklenip
+// doğru şekilde yerleştirilince çağrılır — sıradaki parçaya geçer.
+function advanceLevel1Guide(){
+  if(!LEVEL1_GUIDE_ACTIVE) return;
+  clearLevel1GuideTargetOutline();
+  const remaining=Object.values(pieces).filter(p=>!p.onBoard);
+  if(!remaining.length){
+    finishLevel1Guide();
+    return;
+  }
+  const solution=computeSolution();
+  if(!solution){ finishLevel1Guide(); return; } // beklenmeyen durum — güvenlik ağı
+
+  const next=remaining[0];
+  const target=solution[next.id];
+  LEVEL1_GUIDE_PIECE_ID=next.id;
+  LEVEL1_GUIDE_TARGET=target;
+
+  const alreadyCorrectOri = guideCellsKey(next.cells)===guideCellsKey(target.cells);
+  const hand=document.getElementById('tutHand');
+  hand.classList.remove('pokeAnim','blinkAnim');
+
+  if(!alreadyCorrectOri){
+    LEVEL1_GUIDE_PHASE='rotate';
+    hand.classList.add('blinkAnim'); // döndürme: el, parçanın üstünde yanıp söner
+    setTutMsg('level1GuideRotate');
+    updateLevel1GuidePointer();
+  } else {
+    LEVEL1_GUIDE_PHASE='drag';
+    hand.classList.add('pokeAnim'); // sürükleme: el, hareketli yaklaş-uzaklaş animasyonu
+    setTutMsg('level1GuideDrag');
+    updateLevel1GuidePointer();
+  }
+}
+
+// doRotate() içinden çağrılır (sadece rehberdeki hedef parça döndürülünce):
+// artık doğru yönelime gelip gelmediğini kontrol eder.
+function checkLevel1GuideRotation(){
+  if(!LEVEL1_GUIDE_ACTIVE || !LEVEL1_GUIDE_TARGET) return;
+  const p=pieces[LEVEL1_GUIDE_PIECE_ID];
+  if(!p) return;
+  const matches = guideCellsKey(p.cells)===guideCellsKey(LEVEL1_GUIDE_TARGET.cells);
+  if(matches){
+    LEVEL1_GUIDE_PHASE='drag';
+    const hand=document.getElementById('tutHand');
+    hand.classList.remove('blinkAnim');
+    hand.classList.add('pokeAnim');
+    setTutMsg('level1GuideDrag');
+    updateLevel1GuidePointer();
+  }
+}
+
+function finishLevel1Guide(){
+  LEVEL1_GUIDE_ACTIVE=false;
+  LEVEL1_GUIDE_PIECE_ID=null;
+  LEVEL1_GUIDE_PHASE=null;
+  LEVEL1_GUIDE_TARGET=null;
+  localStorage_set('pz_level1_guided_done','1');
+  const hand=document.getElementById('tutHand');
+  hand.classList.remove('show','pokeAnim','blinkAnim');
+  document.getElementById('tutMsg').classList.remove('show');
+  CURRENT_TUT_MSG_KEY=null;
+  clearLevel1GuideTargetOutline();
+  setFooterEnabled(true);
+  document.getElementById('prevBtn').disabled = LEVEL<=0;
+  document.getElementById('nextBtn').disabled = LEVEL>=MAX_LEVEL || LEVEL>=TOTAL_LEVELS-1;
+}
+
+// Bir parçayı tepsiden hedef konuma yumuşak bir "el işaretiyle" sürükleyip bırakır
+function demoDragPiece(p, targetR, targetC, targetOri){
+  return new Promise(resolve=>{
+    const cursor=document.getElementById('demoCursor');
+    const box=p._box;
+    if(!box){ resolve(); return; }
+
+    const orientedCells=orientCells(p.def.cells, targetOri);
+    const bb=bbOf(orientedCells);
+
+    const boxRect=box.getBoundingClientRect();
+    const boardRect=boardEl.getBoundingClientRect();
+
+    const startX=boxRect.left+boxRect.width/2;
+    const startY=boxRect.top+boxRect.height/2;
+    const targetX=boardRect.left+targetC*CS+(bb.cols*CS)/2;
+    const targetY=boardRect.top+targetR*CS+(bb.rows*CS)/2;
+
+    // Uçan parça katmanı (canvas) — hedef yönelimiyle çizilir
+    box.style.opacity='0';
+    const fly=document.createElement('div');
+    fly.style.cssText=`position:fixed;left:0;top:0;pointer-events:none;z-index:10001;
+      transform:translate(${startX}px,${startY}px)`;
+    const cvs=document.createElement('canvas');
+    cvs.width=bb.cols*CS; cvs.height=bb.rows*CS;
+    cvs.style.cssText='display:block;transform:translate(-50%,-50%)';
+    drawCells(cvs.getContext('2d'), orientedCells, CS, p.def.color, p.def.dark);
+    fly.appendChild(cvs);
+    document.body.appendChild(fly);
+
+    cursor.style.left=startX+'px';
+    cursor.style.top=startY+'px';
+
+    const dur=900;
+    const t0=performance.now();
+    let raf=null;
+
+    function step(now){
+      if(demoCancelled){ cleanup(); resolve(); return; }
+      const t=Math.min(1,(now-t0)/dur);
+      const e=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; // ease-in-out
+      const x=startX+(targetX-startX)*e;
+      const y=startY+(targetY-startY)*e;
+      fly.style.transform=`translate(${x}px,${y}px)`;
+      cursor.style.left=x+'px';
+      cursor.style.top=y+'px';
+      if(t<1){
+        raf=requestAnimationFrame(step);
+      } else {
+        // Bırakma anı: küçük "pop"
+        fly.style.transition='transform .15s';
+        fly.style.transform=`translate(${targetX}px,${targetY}px) scale(1.08)`;
+        setTimeout(()=>{
+          cleanup();
+          p.ori=targetOri;
+          p.cells=orientedCells;
+          place(p,targetR,targetC);
+          renderPlaced();
+          buildTray();
+          resolve();
+        },160);
+      }
+    }
+    function cleanup(){
+      if(raf) cancelAnimationFrame(raf);
+      fly.remove();
+    }
+    raf=requestAnimationFrame(step);
+  });
+}
+
+function setFooterEnabled(enabled){
+  ['homeBtn','prevBtn','nextBtn','hintBtn','resetBtn','solveBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=!enabled;
+  });
+}
+
+function finishIntroDemo(){
+  demoActive=false;
+  tutorialInteractive=false;
+  document.getElementById('demoBanner').classList.remove('show');
+  document.getElementById('demoCursor').classList.remove('show');
+  document.getElementById('demoSkipWrap').classList.remove('show');
+  document.getElementById('tutHand').classList.remove('show');
+  document.getElementById('tutMsg').classList.remove('show');
+  CURRENT_TUT_MSG_KEY=null;
+  setFooterEnabled(true);
+  markDemoDone();
+  LEVEL=0;
+  loadLevel();
+}
+
+document.getElementById('demoSkipBtn').addEventListener('click',()=>{
+  demoCancelled=true;
+  tutorialInteractive=false;
+  if(demoWait._cancelFns){ demoWait._cancelFns.forEach(fn=>fn()); demoWait._cancelFns=[]; }
+  finishIntroDemo();
+});
+
+
+// ═══════════════════════════════════════════════════════
+// KULLANICI + ÜNVAN + GLOBAL SIRALAMA
+// ═══════════════════════════════════════════════════════
+const TITLES={
+  en:['Novice','Beginner',
+      'Apprentice','Skilled',
+      'Analyst','Strategist',
+      'Master','Genius',
+      'Legend','Mind God'],
+  tr:['Acemi','Çaylak',
+      'Çırak','Usta',
+      'Analist','Stratejist',
+      'Üstat','Dahi',
+      'Efsane','Zeka Tanrısı'],
+  es:['Novato','Principiante',
+      'Aprendiz','Hábil',
+      'Analista','Estratega',
+      'Maestro','Genio',
+      'Leyenda','Dios Mental'],
+  ar:['مبتدئ','هاوٍ',
+      'متدرب','ماهر',
+      'محلل','استراتيجي',
+      'متمكن','عبقري',
+      'أسطورة','إله العقل'],
+  ru:['Новичок','Начинающий',
+      'Подмастерье','Умелец',
+      'Аналитик','Стратег',
+      'Мастер','Гений',
+      'Легенда','Бог разума'],
+};
+
+// Her grid aşaması 2 ünvana bölünür (aşamanın ilk yarısı / ikinci yarısı)
+function titleIndexFor(level){
+  let off=0;
+  for(let si=0; si<STAGES.length; si++){
+    const st=STAGES[si];
+    if(level<off+st.count){
+      const local=level-off;              // 0-based bu aşamada
+      const half=local < st.count/2 ? 0:1; // ilk yarı / ikinci yarı
+      return si*2+half;
+    }
+    off+=st.count;
+  }
+  return TITLES.en.length-1;
+}
+function titleFor(level){
+  const list=TITLES[LANG]||TITLES.en;
+  return list[Math.min(titleIndexFor(level),list.length-1)];
+}
+
+// ═══════════════════════════════════════════════════════
+// IQ EĞRİSİ — 85 (bölüm 1) → 160 (bölüm 255)
+// ═══════════════════════════════════════════════════════
+const IQ_START=85, IQ_END=160;
+function iqFor(level){
+  const total=TOTAL_LEVELS;
+  const frac=Math.min(1,Math.max(0,level/(total-1)));
+  return Math.round(IQ_START + (IQ_END-IQ_START)*Math.pow(frac,0.85));
+}
+
+
+let USERNAME=localStorage_get('pz_user')||'';
+
+// storage yardımcıları: Firestore (merkezi/shared) + localStorage (kişisel)
+// ═══════════════════════════════════════════════════════
+// BAĞLANTI DURUMU — kullanıcı adı benzersizliği ve skor/IQ/sıralama
+// SADECE gerçek Firestore veritabanına erişilebilirken çalışır.
+// Bağlantı yoksa/hataysa cihaz "offline" kabul edilir; bu durumda
+// localStorage'a asla kullanıcı-adı veya skor verisi YAZILMAZ —
+// çünkü offline yazılan veri benzersizliği garanti edemez.
+// ═══════════════════════════════════════════════════════
+let ONLINE_OK=null; // null=henüz test edilmedi, true/false=son bilinen durum
+
+async function checkOnline(){
+  try{
+    // Hafif bir "ping": var olmayan bir dokümanı okumak bile bağlantıyı doğrular
+    // (doküman yoksa hata atmaz, sadece exists:false döner — sadece ağ hatası fırlatır).
+    await db.collection('_meta').doc('ping').get();
+    ONLINE_OK=true;
+    updateOfflineBadge();
+    return true;
+  }catch(e){
+    ONLINE_OK=false;
+    updateOfflineBadge();
+    return false;
+  }
+}
+
+function updateOfflineBadge(){
+  const el=document.getElementById('offlineBadge');
+  if(!el) return;
+  if(USERNAME && ONLINE_OK===false){
+    el.style.display='';
+    el.title=T('offlineMode');
+  } else {
+    el.style.display='none';
+  }
+}
+
+// Paylaşımlı (shared) veriler için storage yardımcıları — artık Firestore'a yazıyor.
+// Bunlar SADECE gerçek bağlantı üzerinde çalışır — offline'da
+// başarısız olur (localStorage'a düşmez), çünkü bu veriler benzersizlik/
+// doğruluk gerektirir (kullanıcı adları, skorlar, sıralama).
+// Tüm shared anahtarlar tek bir koleksiyonda ('shared_kv') doküman ID'si
+// olarak tam anahtarla (örn. "user:ahmet", "score:ahmet") saklanır.
+async function sGetShared(key){
+  const doc=await db.collection('shared_kv').doc(key).get();
+  return doc.exists ? doc.data().value : null;
+}
+async function sSetShared(key,val){
+  await db.collection('shared_kv').doc(key).set({
+    value: val,
+    updated: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  return true;
+}
+async function sListShared(prefix){
+  const snap=await db.collection('shared_kv')
+    .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+    .where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff')
+    .get();
+  return snap.docs.map(d=>d.id);
+}
+
+// Kişisel (shared olmayan) veriler için — bunlar cihaza özel olduğundan
+// sadece localStorage kullanılır (senkronizasyon gerektirmez).
+async function sGet(key,shared){
+  if(shared) return sGetShared(key);
+  return localStorage_get('s_'+key);
+}
+async function sSet(key,val,shared){
+  if(shared) return sSetShared(key,val);
+  localStorage_set('s_'+key,val);return true;
+}
+async function sList(prefix,shared){
+  if(shared) return sListShared(prefix);
+  const out=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('s_'+prefix)) out.push(k.slice(2));
+    }
+  }catch(e){}
+  return out;
+}
+
+function escHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function normName(n){return n.trim().replace(/\s+/g,' ');}
+function nameKey(n){return n.toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]/g,'_');}
+
+// Yeni kullanıcı oluşturulduğunda önceki oyuncunun tüm yerel ilerlemesini sıfırla
+function resetLocalPlayerState(alsoResetDemoFlag){
+  const keysToWipe=[
+    'pz_level','pz_maxlevel','pz_earnedlevel','pz_score','pz_bonushints',
+    'pz_levelssincebonus','pz_completed'
+  ];
+  if(alsoResetDemoFlag) keysToWipe.push('pz_demo_done');
+  keysToWipe.forEach(k=>{ try{localStorage.removeItem(k);}catch(e){} });
+
+  LEVEL=0;
+  MAX_LEVEL=0;
+  EARNED_LEVEL=0;
+  SCORE=0;
+  BONUS_HINTS=0;
+  levelsSinceBonus=0;
+  hintUsed=0;
+  COMPLETED_LEVELS.clear();
+  CURRENT_LEVEL_ALREADY_COMPLETED=false;
+
+  updateScoreBadge();
+}
+
+async function registerUser(name){
+  const key='user:'+nameKey(name);
+  let existing;
+  try{
+    existing=await sGetShared(key);
+  }catch(e){
+    // Merkezi storage'a ulaşılamadı — benzersizlik garanti edilemeyeceği için
+    // kullanıcı adı ASLA yerel olarak kaydedilmez.
+    ONLINE_OK=false; updateOfflineBadge();
+    return {ok:false, offline:true, err:T('offlineRequired')};
+  }
+  ONLINE_OK=true; updateOfflineBadge();
+  if(existing!==null&&existing!==undefined){
+    // İsim alınmış — bu cihazın ismi mi?
+    if(localStorage_get('pz_user')===name) return {ok:true};
+    return {ok:false,err:T('nameTaken')};
+  }
+  try{
+    await sSetShared(key,JSON.stringify({name,created:Date.now()}));
+  }catch(e){
+    ONLINE_OK=false; updateOfflineBadge();
+    return {ok:false, offline:true, err:T('offlineRequired')};
+  }
+  return {ok:true};
+}
+
+async function saveScore(){
+  if(!USERNAME) return;
+  try{
+    const iq=iqFor(EARNED_LEVEL);
+    // ÖNEMLİ: ünvanı ÇEVRİLMİŞ METİN olarak DEĞİL, earnedLevel (sayısal) olarak
+    // kaydediyoruz. Böylece Şampiyonlar Ligi'ni görüntüleyen her kullanıcı,
+    // ünvanı KENDİ dilinde hesaplayıp gösterir — kaydedenin dilinde donmuş
+    // bir metin kalmaz (önceki "TR/EN karışık ünvan" hatasının kök nedeni buydu).
+    const data=JSON.stringify({name:USERNAME,iq,score:SCORE,level:LEVEL,earnedLevel:EARNED_LEVEL,title:titleFor(EARNED_LEVEL),t:Date.now()});
+    await sSet('score:'+nameKey(USERNAME),data,true);
+  }catch(e){
+    // Offline — skor merkezi tabloya yazılamadı, sessizce vazgeç (yerel ilerleme etkilenmez)
+  }
+}
+
+function updateUserTag(){
+  if(!USERNAME) return;
+  document.getElementById('userTag').textContent=
+    '👤 '+USERNAME+' • '+titleFor(EARNED_LEVEL);
+}
+
+// ── Kullanıcı adı modalı ──
+// İlk açılışta, kullanıcı adı ekranından bile ÖNCE gösterilir — her buton
+// KENDİ dilinde yazılı olduğu için kullanıcı henüz hiçbir metni okuyamasa
+// bile kendi dilini bulabilir. Seçilince LANG hemen uygulanır (applyLang()),
+// böylece sonraki tüm ekranlar (kullanıcı adı, tanıtım, Bölüm 0, Bölüm 1
+// rehberi) baştan itibaren DOĞRU dilde açılır.
+function askLanguagePick(){
+  const modal=document.getElementById('langPickModal');
+  modal.classList.add('show');
+  return new Promise(resolve=>{
+    document.querySelectorAll('.langPickBtn').forEach(btn=>{
+      btn.onclick=()=>{
+        LANG=btn.dataset.lang;
+        localStorage_set('pz_lang',LANG);
+        applyLang();
+        modal.classList.remove('show');
+        resolve();
+      };
+    });
+  });
+}
+
+async function askUsername(forced){
+  const modal=document.getElementById('nameModal');
+  const input=document.getElementById('nameInput');
+  const err=document.getElementById('nameErr');
+  const okBtn=document.getElementById('nameOkBtn');
+  const backBtn=document.getElementById('nameBackBtn');
+  modal.classList.add('show');
+  backBtn.style.display=''; // artık zorunlu modda da görünür (dil menüsüne dönüş için kullanılıyor)
+  err.textContent='';
+  err.classList.remove('offlineErr');
+  okBtn.textContent=T('startBtn');
+  okBtn.disabled=false;
+  input.focus();
+
+  return new Promise(resolve=>{
+    async function submit(){
+      const name=normName(input.value);
+      err.textContent='';
+      err.classList.remove('offlineErr');
+      if(name.length<3){err.textContent=T('nameTooShort');return;}
+      if(name.length>16){err.textContent=T('nameTooLong');return;}
+      // Sadece harf/rakam/boşluk — görünmez/kontrol karakterleri ve emoji ile
+      // kimlik taklidini (impersonation) engeller.
+      if(!/^[A-Za-zÇĞİIıÖŞÜçğıöşü0-9 ]+$/.test(name)){err.textContent=T('nameInvalidChars');return;}
+      okBtn.disabled=true;
+      okBtn.textContent=T('checkingBtn');
+      const res=await registerUser(name);
+      okBtn.disabled=false;
+      if(!res.ok){
+        err.textContent=res.err;
+        if(res.offline){
+          err.classList.add('offlineErr');
+          okBtn.textContent=T('retryBtn'); // aynı buton artık "tekrar dene" işlevi görür
+        } else {
+          okBtn.textContent=T('startBtn');
+        }
+        return;
+      }
+
+      const previousUser=USERNAME;
+      const isDifferentUser = previousUser!==name; // aynı ismi tekrar girmiyor
+      if(isDifferentUser){
+        resetLocalPlayerState(true); // eski oyuncunun ilerlemesini + demo bayrağını sıfırla
+        logAnalyticsEvent('sign_up', {method:'guest_username'});
+      }
+
+      USERNAME=name;
+      localStorage_set('pz_user',name);
+      modal.classList.remove('show');
+      updateUserTag();
+      saveScore();
+      resolve({cancelled:false});
+    }
+    function goBack(){
+      modal.classList.remove('show');
+      resolve({cancelled:true});
+    }
+    okBtn.onclick=submit;
+    backBtn.onclick=goBack;
+    input.onkeydown=e=>{if(e.key==='Enter')submit();};
+  });
+}
+
+// ── Liderlik tablosu ──
+async function fetchLeaderboardEntries(){
+  // ÖNEMLİ: önceki sürüm önce tüm 'score:*' doküman ID'lerini çekiyor, SONRA
+  // her birini TEK TEK ve SIRAYLA (await ile) yeniden çekiyordu — 116 oyuncu
+  // varsa 116 ayrı ağ gidiş-dönüşü, art arda! Bu, "2-3 dakika" bekleme
+  // şikayetinin gerçek kök nedeniydi. Firestore'un aralık sorgusu zaten TÜM
+  // doküman verisini TEK istekte döndürüyor — bunu doğrudan kullanıyoruz.
+  const prefix='score:';
+  const snap=await db.collection('shared_kv')
+    .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
+    .where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff')
+    .get();
+  const entries=[];
+  snap.docs.forEach(doc=>{
+    try{
+      const raw=doc.data().value;
+      if(!raw) return;
+      const d=JSON.parse(raw);
+      if(d && d.name) entries.push(d);
+    }catch(e){}
+  });
+  entries.sort((a,b)=>(b.score||0)-(a.score||0));
+  return entries;
+}
+
+function rankOf(entries,name){
+  const i=entries.findIndex(e=>e.name===name);
+  return i<0?null:i+1; // 1-index sıra; bulunamazsa null
+}
+
+async function showLeaderboard(){
+  const modal=document.getElementById('lbModal');
+  const list=document.getElementById('lbList');
+  modal.classList.add('show');
+  list.innerHTML='<p style="text-align:center;color:#607080">...</p>';
+
+  let entries=[];
+  try{
+    entries=await fetchLeaderboardEntries();
+  }catch(e){
+    list.innerHTML=`<p style="text-align:center;color:#ff8a4a">📡 ${T('offlineMode')}</p>`;
+    return;
+  }
+
+  if(!entries.length){
+    list.innerHTML=`<p style="text-align:center;color:#607080">${T('lbEmpty')}</p>`;
+    return;
+  }
+  list.innerHTML='';
+
+  function buildRow(d,i){
+    const row=document.createElement('div');
+    row.className='lbRow'+(d.name===USERNAME?' me':'');
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+    // Ünvan HER ZAMAN görüntüleyen kullanıcının GÜNCEL dilinde hesaplanır
+    // (kaydedilen d.title metnine güvenilmez — bu, farklı dillerdeki
+    // oyuncuların ünvanlarının karışık görünmesine yol açan hataydı).
+    const earnedLvl=(typeof d.earnedLevel==='number')?d.earnedLevel:(Number(d.level)||0);
+    const titleTxt=titleFor(earnedLvl);
+    row.innerHTML=`<span class="rank">${medal}</span>
+      <span class="name">${escHtml(d.name)}<br><span class="title">${escHtml(titleTxt)} • 🧠 IQ ${Number(d.iq)||85} • 🎯 ${T('lvl')} ${earnedLvl+1}</span></span>
+      <span class="score">⭐ ${Number(d.score)||0}</span>`;
+    return row;
+  }
+
+  function appendSeparator(){
+    const sep=document.createElement('div');
+    sep.style.cssText='text-align:center;color:#607080;font-size:.85em;padding:2px 0;letter-spacing:.15em;';
+    sep.textContent='•••';
+    list.appendChild(sep);
+  }
+
+  const TOP_N=10, AROUND=3, BOTTOM_N=5;
+  const meRank=rankOf(entries,USERNAME); // 1-index veya null
+
+  // 1) EN ÜSTTE: kullanıcının kendi sırası — kalın/belirgin
+  if(meRank){
+    const rankNote=document.createElement('div');
+    rankNote.className='lbMyRankNote';
+    rankNote.textContent=T('lbYourRank').replace('{rank}',meRank).replace('{total}',entries.length);
+    list.appendChild(rankNote);
+  }
+
+  // 2) Sabit Top 10
+  const topCount=Math.min(TOP_N,entries.length);
+  for(let i=0;i<topCount;i++){
+    list.appendChild(buildRow(entries[i],i));
+  }
+  let lastShownRank=topCount; // 1-index, şu ana kadar gösterilen son sıra
+
+  // 3) Kullanıcının sırası ±3 (Top 10 dışındaysa)
+  if(meRank && meRank>TOP_N){
+    appendSeparator();
+    const lo=Math.max(TOP_N+1,meRank-AROUND);
+    const hi=Math.min(entries.length,meRank+AROUND);
+    for(let r=lo;r<=hi;r++){
+      list.appendChild(buildRow(entries[r-1],r-1));
+    }
+    lastShownRank=hi;
+  }
+
+  // 4) EN ALTTA: genel sıralamanın son 5'i (zaten gösterilenlerle çakışmıyorsa)
+  const bottomLo=Math.max(1,entries.length-BOTTOM_N+1);
+  if(entries.length>lastShownRank){
+    if(bottomLo>lastShownRank){ appendSeparator(); } // araya boşluk varsa ayırıcı koy
+    for(let r=Math.max(bottomLo,lastShownRank+1);r<=entries.length;r++){
+      list.appendChild(buildRow(entries[r-1],r-1));
+    }
+  }
+}
+document.getElementById('lbCloseBtn').onclick=()=>{
+  document.getElementById('lbModal').classList.remove('show');
+};
+
+// ═══════════════════════════════════════════════════════
+// BÖLÜM HARİTASI — 255 bölümü aşama sekmeleriyle gezinme
+// ═══════════════════════════════════════════════════════
+let MAP_ACTIVE_STAGE=0;
+
+function stageStartIndex(stageIdx){
+  let off=0;
+  for(let i=0;i<stageIdx;i++) off+=STAGES[i].count;
+  return off;
+}
+
+function showLevelMap(){
+  const modal=document.getElementById('mapModal');
+  modal.classList.add('show');
+
+  // Aktif sekmeyi mevcut LEVEL'ın bulunduğu aşamaya ayarla
+  let off=0;
+  for(let i=0;i<STAGES.length;i++){
+    if(LEVEL<off+STAGES[i].count){ MAP_ACTIVE_STAGE=i; break; }
+    off+=STAGES[i].count;
+  }
+
+  renderMapTabs();
+  renderMapGrid();
+}
+
+function renderMapTabs(){
+  const tabs=document.getElementById('mapStageTabs');
+  tabs.innerHTML='';
+  STAGES.forEach((st,i)=>{
+    const btn=document.createElement('button');
+    btn.className='mapStageTab'+(i===MAP_ACTIVE_STAGE?' active':'');
+    btn.textContent=`${st.grid}×${st.grid}`;
+    btn.onclick=()=>{
+      MAP_ACTIVE_STAGE=i;
+      SFX.click();
+      renderMapTabs();
+      renderMapGrid();
+    };
+    tabs.appendChild(btn);
+  });
+}
+
+function renderMapGrid(){
+  const grid=document.getElementById('mapGrid');
+  grid.innerHTML='';
+  const stage=STAGES[MAP_ACTIVE_STAGE];
+  const start=stageStartIndex(MAP_ACTIVE_STAGE);
+
+  for(let i=0;i<stage.count;i++){
+    const globalIdx=start+i; // 0-based genel bölüm no
+    const cell=document.createElement('div');
+    const isDone=COMPLETED_LEVELS.has(globalIdx);
+    const isCurrent=globalIdx===LEVEL;
+    const isUnlocked=globalIdx<=MAX_LEVEL;
+
+    let cls='mapCell';
+    if(isDone) cls+=' done';
+    if(isCurrent) cls+=' current';
+    if(!isUnlocked) cls+=' locked';
+    cell.className=cls;
+
+    if(isUnlocked){
+      cell.innerHTML=`${i+1}${isDone?'<span class="mapCheck">✅</span>':''}`;
+      cell.onclick=()=>{
+        LEVEL=globalIdx;
+        SFX.click();
+        document.getElementById('mapModal').classList.remove('show');
+        document.getElementById('mainMenu').classList.remove('show');
+        loadLevel();
+      };
+    } else {
+      cell.innerHTML='🔒';
+    }
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('mapCloseBtn').onclick=()=>{
+  document.getElementById('mapModal').classList.remove('show');
+};
+
+// ═══════════════════════════════════════════════════════
+// SIRALAMA RULETİ — bölüm sonu eski sıra → yeni sıra animasyonu
+// ═══════════════════════════════════════════════════════
+async function playRankShiftAnimation(oldEntries, oldRank){
+  const panel=document.getElementById('rankShiftPanel');
+  const track=document.getElementById('rankShiftTrack');
+  const deltaEl=document.getElementById('rankShiftDelta');
+
+  if(!USERNAME){ panel.classList.remove('show'); return; }
+
+  let newEntries=[];
+  try{ newEntries=await fetchLeaderboardEntries(); }catch(e){ newEntries=oldEntries||[]; }
+  const newRank=rankOf(newEntries,USERNAME);
+
+  if(newRank===null){
+    // Liderlik tablosu okunamadı / kayıt bulunamadı — yine de bir mesaj göster
+    panel.classList.add('show');
+    track.innerHTML='';
+    deltaEl.className='same';
+    deltaEl.textContent=T('rankUnavailable');
+    return;
+  }
+
+  panel.classList.add('show');
+  track.innerHTML='';
+
+  const ROW_H=38; // .rsRow yüksekliği + boşluk
+
+  // oldRank bilinmiyorsa (ör. ilk kayıt), yeni sırayı başlangıç noktası olarak kullan
+  const effectiveOldRank = oldRank===null ? newRank : oldRank;
+
+  // Görsel pencere: eski sıranın etrafındaki birkaç satırı göster (kaymayı gözlemleyebilmek için)
+  const windowStart=Math.max(1, Math.min(effectiveOldRank,newRank)-1);
+  const windowEnd=Math.min(newEntries.length, Math.max(effectiveOldRank,newRank)+1);
+
+  // Eski listedeki görünür satırları oluştur (başlangıç konumları = eski sıra)
+  const rowEls={};
+  for(let r=windowStart;r<=windowEnd;r++){
+    const entry=(oldEntries&&oldEntries[r-1]) || newEntries[r-1];
+    if(!entry) continue;
+    const el=document.createElement('div');
+    el.className='rsRow'+(entry.name===USERNAME?' me':'');
+    el.innerHTML=`<span class="rsRank">${r}</span>
+      <span class="rsName">${(entry.name||'').replace(/</g,'&lt;')}</span>
+      <span class="rsScore">⭐ ${entry.score||0}</span>`;
+    const startPos=(r-windowStart)*ROW_H+8;
+    el.style.top=startPos+'px';
+    track.appendChild(el);
+    rowEls[entry.name]=el;
+  }
+
+  deltaEl.textContent='';
+  deltaEl.className='';
+
+  await new Promise(res=>setTimeout(res,150));
+
+  // Yeni konumlara geçiş: her satırı yeni sırasındaki pozisyona kaydır,
+  // yeni skor değerlerini de güncelle (puan/isim değişmiş olabilir)
+  for(let r=windowStart;r<=windowEnd;r++){
+    const entry=newEntries[r-1];
+    if(!entry) continue;
+    let el=rowEls[entry.name];
+    if(!el){
+      // Pencereye yeni giren biri varsa (nadiren) anında ekle
+      el=document.createElement('div');
+      el.className='rsRow'+(entry.name===USERNAME?' me':'');
+      el.style.opacity='0';
+      const startPos=(r-windowStart)*ROW_H+8;
+      el.style.top=startPos+'px';
+      track.appendChild(el);
+      rowEls[entry.name]=el;
+      requestAnimationFrame(()=>{el.style.transition='opacity .5s';el.style.opacity='1';});
+    }
+    el.innerHTML=`<span class="rsRank">${r}</span>
+      <span class="rsName">${(entry.name||'').replace(/</g,'&lt;')}</span>
+      <span class="rsScore">⭐ ${entry.score||0}</span>`;
+    const newPos=(r-windowStart)*ROW_H+8;
+    el.style.top=newPos+'px';
+  }
+
+  await new Promise(res=>setTimeout(res,400));
+
+  const diff=effectiveOldRank-newRank; // pozitif = yükseldi (sıra numarası küçüldü)
+  if(oldRank===null){
+    deltaEl.className='same';
+    deltaEl.textContent=`#${newRank} ${T('rankEntered')}`;
+  } else if(diff>0){
+    deltaEl.className='up';
+    deltaEl.textContent=`🔼 +${diff} ${T('rankUp')}  (#${oldRank} → #${newRank})`;
+    SFX.rankUp();
+  } else if(diff<0){
+    deltaEl.className='down';
+    deltaEl.textContent=`🔽 ${diff} ${T('rankDown')}  (#${oldRank} → #${newRank})`;
+    SFX.rankDown();
+  } else {
+    deltaEl.className='same';
+    deltaEl.textContent=`#${newRank} ${T('rankSame')}`;
+  }
+}
+
+
+
+// ═══════════════════════════════════════════════════════
+// DİL + ANA MENÜ
+// ═══════════════════════════════════════════════════════
+const I18N={
+  en:{
+    play:'Play', champ:'Champions League', rules:'How to Play', levelMap:'Level Map', streakDays:'day streak', privacyOptions:'Privacy Options',
+    sub:'Brain Blocks • 255 Levels',
+    rulesTitle:'📜 How to Play',
+    rulesBody:`<b>Goal:</b> Place all pieces so only the <b>target (red) cell</b> stays empty.<br><br>
+<b>Controls:</b><br>• <b>Tap</b> a piece → rotates (4 dirs + 4 mirrored)<br>• <b>Hold & drag</b> → place on board<br>• Tap a placed piece → remove it<br><br>
+<b>Levels:</b><br>• 1–25: 5×5 board<br>• 26–61: 6×6 board<br>• 62–110: 7×7 board<br>• 111–174: 8×8 board<br>• 175–255: 9×9 board<br><br>
+<b>Hints:</b> 1 on 5×5, 2 on 6×6, 3 on 7×7, 4 on 8×8, 5 on 9×9. Watch an ad to earn +1 hint!<br><br>
+<b>IQ & Titles:</b> +1 IQ per level. New title every 5 levels!`,
+    lvl:'Level', target:'Target', targetEnd:'cell must stay empty', tap:'Tap → rotate',
+    hint:'💡 Hint', reset:'↺ Reset', ad:'📺 Watch Ad & Get Hint', prevLevel:'Prev', nextLevel:'Next',
+    win:'🎉 Level Complete!', next:'Next Level →', newTitle:'New Title',
+    hintOver:'💡 No hints left — watch an ad for more', hintUsedT:'💡 Hint',
+    adWait:'Ad:', adDone:'Ad finished!', adClose:'✕ Close Ad & Get Hint', adLoading:'Loading ad...', adFailed:'Ad failed to show, try again', adNotReady:'Ad not ready yet, try again shortly', adTimeoutFallback:'No ad available right now — try again in a moment', adHintEarned:'💡 +1 hint earned!', adClosedNoReward:'Ad closed early — no hint earned',
+    allDone:'🏆 You finished all 255 levels!', empty:'cells empty — only the target must stay empty',
+    lbTitle:'🏆 Champions League', lbEmpty:'Nobody yet — be the first!', close:'✕ Close', rankUp:'ranks up', rankDown:'ranks down', rankSame:'no change', rankUnavailable:'Ranking unavailable', rankLoading:'🏆 Updating ranking...', rankEntered:'entered the ranking', newTitleLabel:'New Title Unlocked!', currentTitleLabel:'Your Title', offlineRequired:'Internet connection required to create a username', nameTaken:'This username is already taken!', nameTooShort:'Must be at least 3 characters', nameTooLong:'Max 16 characters', nameInvalidChars:'Only letters, numbers and spaces allowed', setUsernameTitle:'👤 Set Username', namePlaceholder:'e.g: BrainKing42', startBtn:'Start ▶', checkingBtn:'Checking...', retryBtn:'⟳ Retry', offlineMode:'Offline — score, IQ & ranking disabled', backBtn:'◀ Back', lbYourRank:'You are #{rank} of {total} players',
+    score:'Score', bonusHint:'Bonus hint earned!', newUser:'New Username', newGame:'New Game', continueGame:'Continue', welcomeBack:'Welcome back', alreadySolved:'Already solved — no points', adSolvedNoReward:'Solved via ad — no points or IQ', demoTitle:'Tutorial', demoSub:'Watch how the game works', skipTutorial:'Skip Tutorial', demoWelcome:'👋 Welcome! Let\'s see how it works...', demoDrag:'👆 Hold & drag the piece onto the board', demoComplete:'✅ That\'s it! Now try it yourself',
+    tutInteractiveSub:'Now it\'s your turn — try it yourself', tutRotateMsg:'👆 Tap the piece to rotate it', tutDragMsg:'✋ Now drag it onto the board', tutDoneMsg:'🎉 Perfect! You\'ve got it',
+    level1GuideHint:'👆 Tap "Hint" to place your first piece', level1GuideRotate:'👆 Tap the piece to rotate it into place', level1GuideDrag:'✋ Now drag this piece onto the marked spot',
+    shareBtnLabel:'📤 Share', shareText:'I just reached {title} (IQ {iq}, Level {level}) in Mind Gap! 🧠 Can you beat me?', shareCopied:'Copied! You can paste it anywhere.',
+    rateModalTitle:'⭐ Enjoying Mind Gap?', rateModalMsg:'A quick rating on Play Store really helps us out!', rateNowBtn:'⭐ Rate Now', rateLaterBtn:'Later', rateNeverBtn:"Don't Ask Again", rateManualFallback:'Store link copied! Paste it in your browser to rate us.',
+  },
+  tr:{
+    play:'Oyna', champ:'Şampiyonlar Ligi', rules:'Oyun Kuralları', levelMap:'Bölüm Haritası', streakDays:'gün seri', privacyOptions:'Gizlilik Tercihleri',
+    sub:'Zeka Blokları • 255 Bölüm',
+    rulesTitle:'📜 Oyun Kuralları',
+    rulesBody:`<b>Amaç:</b> Tüm parçaları tahtaya yerleştir; sadece <b>hedef (kırmızı) kare</b> boş kalsın.<br><br>
+<b>Kontroller:</b><br>• Parçaya <b>dokun</b> → döner (4 yön + 4 ayna)<br>• <b>Basılı tut & sürükle</b> → tahtaya yerleştir<br>• Tahtadaki parçaya dokun → geri alır<br><br>
+<b>Bölümler:</b><br>• 1–25: 5×5 tahta<br>• 26–61: 6×6 tahta<br>• 62–110: 7×7 tahta<br>• 111–174: 8×8 tahta<br>• 175–255: 9×9 tahta<br><br>
+<b>İpucu hakkı:</b> 5×5'te 1, 6×6'da 2, 7×7'de 3, 8×8'de 4, 9×9'da 5. Reklam izle, +1 ipucu kazan!<br><br>
+<b>IQ & Ünvan:</b> Her bölüm +1 IQ. Her 5 bölümde yeni ünvan!`,
+    lvl:'Bölüm', target:'Hedef', targetEnd:'numaralı kare boş kalsın', tap:'Dokun → döndür',
+    hint:'💡 İpucu', reset:'↺ Sıfırla', ad:'📺 Reklam izle & İpucu kazan', prevLevel:'Önceki', nextLevel:'Sonraki',
+    win:'🎉 Bölüm Tamamlandı!', next:'Sonraki Bölüm →', newTitle:'Yeni Ünvan',
+    hintOver:'💡 İpucu hakkın bitti — reklam izleyip kazan', hintUsedT:'💡 İpucu',
+    adWait:'Reklam:', adDone:'Reklam bitti!', adClose:'✕ Reklamı Kapat ve İpucu Al', adLoading:'Reklam yükleniyor...', adFailed:'Reklam gösterilemedi, tekrar dene', adNotReady:'Reklam henüz hazır değil, birazdan tekrar dene', adTimeoutFallback:'Şu an reklam yok — biraz sonra tekrar dene', adHintEarned:'💡 +1 ipucu kazandın!', adClosedNoReward:'Reklam yarıda kapandı — ipucu verilmedi',
+    allDone:'🏆 Tüm 255 bölümü bitirdin!', empty:'kare boş kaldı — sadece hedef kare boş olmalı',
+    lbTitle:'🏆 Şampiyonlar Ligi', lbEmpty:'Henüz kimse yok — ilk sen ol!', close:'✕ Kapat', rankUp:'sıra yükseldi', rankDown:'sıra düştü', rankSame:'değişim yok', rankUnavailable:'Sıralama alınamadı', rankLoading:'🏆 Sıralama güncelleniyor...', rankEntered:'sıralamaya girdi', newTitleLabel:'Yeni Ünvan Kazandın!', currentTitleLabel:'Ünvanın', offlineRequired:'Kullanıcı adı oluşturmak için internet bağlantısı gerekli', nameTaken:'Bu kullanıcı adı zaten alınmış!', nameTooShort:'En az 3 karakter olmalı', nameTooLong:'En fazla 16 karakter', nameInvalidChars:'Sadece harf, rakam ve boşluk kullanılabilir', setUsernameTitle:'👤 Kullanıcı Adı Belirle', namePlaceholder:'ör: ZekaKralı42', startBtn:'Başla ▶', checkingBtn:'Kontrol ediliyor...', retryBtn:'⟳ Tekrar Dene', offlineMode:'Çevrimdışı — puan, IQ ve sıralama devre dışı', backBtn:'◀ Geri', lbYourRank:'{total} oyuncu içinde {rank}.\'sisiniz',
+    score:'Puan', bonusHint:'Bonus ipucu kazandın!', newUser:'Yeni Kullanıcı Adı', newGame:'Yeni Oyun', continueGame:'Devam Et', welcomeBack:'Tekrar hoş geldin', alreadySolved:'Zaten çözülmüş — puan yok', adSolvedNoReward:'Reklamla çözüldü — puan/IQ yok', demoTitle:'Tanıtım', demoSub:'Oyunun nasıl oynandığını izle', skipTutorial:'Tanıtımı Geç', demoWelcome:'👋 Hoş geldin! Nasıl oynandığına bakalım...', demoDrag:'👆 Parçayı basılı tutup tahtaya sürükle', demoComplete:'✅ İşte bu kadar! Şimdi sıra sende',
+    tutInteractiveSub:'Şimdi sıra sende — kendin dene', tutRotateMsg:'👆 Parçaya dokun ve döndür', tutDragMsg:'✋ Şimdi sürükleyip tahtaya yerleştir', tutDoneMsg:'🎉 Harika! Öğrendin',
+    level1GuideHint:'👆 İlk parçayı yerleştirmek için "İpucu"na dokun', level1GuideRotate:'👆 Parçaya dokun, doğru yöne döndür', level1GuideDrag:'✋ Şimdi bu parçayı işaretli yere sürükle',
+    shareBtnLabel:'📤 Paylaş', shareText:'Mind Gap\'te az önce {title} ünvanına ulaştım! (IQ {iq}, Bölüm {level}) 🧠 Beni geçebilir misin?', shareCopied:'Kopyalandı! İstediğin yere yapıştırabilirsin.',
+    rateModalTitle:'⭐ Mind Gap\'i beğendin mi?', rateModalMsg:"Play Store'da bir puan bırakarak destek olabilirsin!", rateNowBtn:'⭐ Değerlendir', rateLaterBtn:'Daha Sonra', rateNeverBtn:'Bir Daha Sorma', rateManualFallback:'Mağaza linki kopyalandı! Tarayıcına yapıştırıp değerlendirebilirsin.',
+  },
+  es:{
+    play:'Jugar', champ:'Liga de Campeones', rules:'Cómo Jugar', levelMap:'Mapa de Niveles', streakDays:'días seguidos', privacyOptions:'Opciones de Privacidad',
+    sub:'Bloques Mentales • 255 Niveles',
+    rulesTitle:'📜 Cómo Jugar',
+    rulesBody:`<b>Objetivo:</b> Coloca todas las piezas; solo la <b>casilla objetivo (roja)</b> debe quedar vacía.<br><br>
+<b>Controles:</b><br>• <b>Toca</b> una pieza → gira (4 direcciones + 4 espejo)<br>• <b>Mantén y arrastra</b> → colócala en el tablero<br>• Toca una pieza colocada → la quita<br><br>
+<b>Niveles:</b><br>• 1–25: tablero 5×5<br>• 26–61: tablero 6×6<br>• 62–110: tablero 7×7<br>• 111–174: tablero 8×8<br>• 175–255: tablero 9×9<br><br>
+<b>Pistas:</b> 1 en 5×5, 2 en 6×6, 3 en 7×7, 4 en 8×8, 5 en 9×9. ¡Mira un anuncio y gana +1 pista!<br><br>
+<b>IQ y Títulos:</b> +1 IQ por nivel. ¡Nuevo título cada 5 niveles!`,
+    lvl:'Nivel', target:'Objetivo', targetEnd:'debe quedar vacía', tap:'Toca → gira',
+    hint:'💡 Pista', reset:'↺ Reiniciar', ad:'📺 Ver Anuncio y Ganar Pista', prevLevel:'Ant.', nextLevel:'Sig.',
+    win:'🎉 ¡Nivel Completado!', next:'Siguiente Nivel →', newTitle:'Nuevo Título',
+    hintOver:'💡 Sin pistas — mira un anuncio para ganar más', hintUsedT:'💡 Pista',
+    adWait:'Anuncio:', adDone:'¡Anuncio terminado!', adClose:'✕ Cerrar y Ganar Pista', adLoading:'Cargando anuncio...', adFailed:'Error al mostrar el anuncio, intenta de nuevo', adNotReady:'El anuncio aún no está listo, intenta en breve', adTimeoutFallback:'No hay anuncio disponible ahora — inténtalo en un momento', adHintEarned:'💡 ¡+1 pista ganada!', adClosedNoReward:'Anuncio cerrado antes de tiempo — sin pista',
+    allDone:'🏆 ¡Completaste los 255 niveles!', empty:'casillas vacías — solo el objetivo debe quedar vacío',
+    lbTitle:'🏆 Liga de Campeones', lbEmpty:'Nadie aún — ¡sé el primero!', close:'✕ Cerrar', rankUp:'subió de puesto', rankDown:'bajó de puesto', rankSame:'sin cambio', rankUnavailable:'Ranking no disponible', rankLoading:'🏆 Actualizando ranking...', rankEntered:'entró al ranking', newTitleLabel:'¡Nuevo Título Desbloqueado!', currentTitleLabel:'Tu Título', offlineRequired:'Se requiere conexión a internet para crear un nombre de usuario', nameTaken:'¡Este nombre de usuario ya está en uso!', nameTooShort:'Debe tener al menos 3 caracteres', nameTooLong:'Máximo 16 caracteres', nameInvalidChars:'Solo letras, números y espacios', setUsernameTitle:'👤 Elegir Nombre de Usuario', namePlaceholder:'ej: ReyMental42', startBtn:'Comenzar ▶', checkingBtn:'Verificando...', retryBtn:'⟳ Reintentar', offlineMode:'Sin conexión — puntos, IQ y ranking desactivados', backBtn:'◀ Atrás', lbYourRank:'Eres el #{rank} de {total} jugadores',
+    score:'Puntos', bonusHint:'¡Pista extra ganada!', newUser:'Nuevo Usuario', newGame:'Nuevo Juego', continueGame:'Continuar', welcomeBack:'Bienvenido de nuevo', alreadySolved:'Ya resuelto — sin puntos', adSolvedNoReward:'Resuelto con anuncio — sin puntos ni IQ', demoTitle:'Tutorial', demoSub:'Mira cómo funciona el juego', skipTutorial:'Omitir Tutorial', demoWelcome:'👋 ¡Bienvenido! Veamos cómo funciona...', demoDrag:'👆 Mantén y arrastra la pieza al tablero', demoComplete:'✅ ¡Eso es todo! Ahora inténtalo tú',
+    tutInteractiveSub:'Ahora te toca a ti — inténtalo', tutRotateMsg:'👆 Toca la pieza para girarla', tutDragMsg:'✋ Ahora arrástrala al tablero', tutDoneMsg:'🎉 ¡Perfecto! Ya lo tienes',
+    level1GuideHint:'👆 Toca "Pista" para colocar tu primera pieza', level1GuideRotate:'👆 Toca la pieza para girarla a su posición', level1GuideDrag:'✋ Ahora arrastra esta pieza al lugar marcado',
+    shareBtnLabel:'📤 Compartir', shareText:'¡Acabo de alcanzar {title} (IQ {iq}, Nivel {level}) en Mind Gap! 🧠 ¿Puedes superarme?', shareCopied:'¡Copiado! Puedes pegarlo donde quieras.',
+    rateModalTitle:'⭐ ¿Te gusta Mind Gap?', rateModalMsg:'¡Una valoración rápida en Play Store nos ayuda mucho!', rateNowBtn:'⭐ Valorar Ahora', rateLaterBtn:'Más Tarde', rateNeverBtn:'No Preguntar Más', rateManualFallback:'¡Enlace copiado! Pégalo en tu navegador para valorarnos.',
+  },
+  ar:{
+    play:'العب', champ:'دوري الأبطال', rules:'كيفية اللعب', levelMap:'خريطة المراحل', streakDays:'أيام متتالية', privacyOptions:'خيارات الخصوصية',
+    sub:'مكعبات الذكاء • 255 مرحلة',
+    rulesTitle:'📜 كيفية اللعب',
+    rulesBody:`<b>الهدف:</b> ضع كل القطع بحيث تبقى <b>الخانة الهدف (الحمراء)</b> فقط فارغة.<br><br>
+<b>التحكم:</b><br>• <b>اضغط</b> على القطعة → تدور (4 اتجاهات + 4 معكوسة)<br>• <b>اضغط مطولاً واسحب</b> → ضعها على اللوحة<br>• اضغط على قطعة موضوعة → تُزال<br><br>
+<b>المراحل:</b><br>• 1–25: لوحة 5×5<br>• 26–61: لوحة 6×6<br>• 62–110: لوحة 7×7<br>• 111–174: لوحة 8×8<br>• 175–255: لوحة 9×9<br><br>
+<b>التلميحات:</b> 1 في 5×5، 2 في 6×6، 3 في 7×7، 4 في 8×8، 5 في 9×9. شاهد إعلانًا لتحصل على +1 تلميح!<br><br>
+<b>الذكاء والألقاب:</b> +1 ذكاء لكل مرحلة. لقب جديد كل 5 مراحل!`,
+    lvl:'المرحلة', target:'الهدف', targetEnd:'يجب أن تبقى فارغة', tap:'اضغط → تدوير',
+    hint:'💡 تلميح', reset:'↺ إعادة', ad:'📺 شاهد إعلانًا واحصل على تلميح', prevLevel:'السابق', nextLevel:'التالي',
+    win:'🎉 اكتملت المرحلة!', next:'المرحلة التالية ←', newTitle:'لقب جديد',
+    hintOver:'💡 انتهت التلميحات — شاهد إعلانًا للحصول على المزيد', hintUsedT:'💡 تلميح',
+    adWait:'إعلان:', adDone:'انتهى الإعلان!', adClose:'✕ أغلق واحصل على تلميح', adLoading:'جارٍ تحميل الإعلان...', adFailed:'تعذر عرض الإعلان، حاول مرة أخرى', adNotReady:'الإعلان غير جاهز بعد، حاول بعد قليل', adTimeoutFallback:'لا يوجد إعلان متاح الآن — حاول بعد قليل', adHintEarned:'💡 حصلت على +1 تلميح!', adClosedNoReward:'أُغلق الإعلان مبكرًا — لم تحصل على تلميح',
+    allDone:'🏆 أنهيت كل الـ255 مرحلة!', empty:'خانات فارغة — فقط الهدف يجب أن يبقى فارغاً',
+    lbTitle:'🏆 دوري الأبطال', lbEmpty:'لا أحد بعد — كن الأول!', close:'✕ إغلاق', rankUp:'ترقية بالترتيب', rankDown:'تراجع بالترتيب', rankSame:'بدون تغيير', rankUnavailable:'الترتيب غير متاح', rankLoading:'🏆 يتم تحديث الترتيب...', rankEntered:'دخل الترتيب', newTitleLabel:'لقب جديد مفتوح!', currentTitleLabel:'لقبك', offlineRequired:'يلزم الاتصال بالإنترنت لإنشاء اسم مستخدم', nameTaken:'اسم المستخدم هذا مُستخدم بالفعل!', nameTooShort:'يجب ألا يقل عن 3 أحرف', nameTooLong:'الحد الأقصى 16 حرفاً', nameInvalidChars:'الأحرف والأرقام والمسافات فقط', setUsernameTitle:'👤 تعيين اسم المستخدم', namePlaceholder:'مثال: ملك٤٢', startBtn:'ابدأ ▶', checkingBtn:'جارٍ التحقق...', retryBtn:'⟳ أعد المحاولة', offlineMode:'غير متصل — النقاط والذكاء والترتيب معطلة', backBtn:'◀ رجوع', lbYourRank:'أنت #{rank} من أصل {total} لاعباً',
+    score:'النقاط', bonusHint:'حصلت على تلميح إضافي!', newUser:'اسم مستخدم جديد', newGame:'لعبة جديدة', continueGame:'متابعة', welcomeBack:'مرحباً بعودتك', alreadySolved:'تم حلها مسبقاً — بلا نقاط', adSolvedNoReward:'حُلّت عبر الإعلان — بلا نقاط أو ذكاء', demoTitle:'تعليمي', demoSub:'شاهد كيف تعمل اللعبة', skipTutorial:'تخطي الشرح', demoWelcome:'👋 مرحباً! لنرَ كيف تعمل...', demoDrag:'👆 اضغط مطولاً واسحب القطعة إلى اللوحة', demoComplete:'✅ هذا كل شيء! الآن جرّب بنفسك',
+    tutInteractiveSub:'الآن دورك — جرّب بنفسك', tutRotateMsg:'👆 اضغط على القطعة لتدويرها', tutDragMsg:'✋ الآن اسحبها إلى اللوحة', tutDoneMsg:'🎉 ممتاز! لقد أتقنتها',
+    level1GuideHint:'👆 اضغط على "تلميح" لوضع أول قطعة', level1GuideRotate:'👆 اضغط على القطعة لتدويرها إلى مكانها الصحيح', level1GuideDrag:'✋ الآن اسحب هذه القطعة إلى المكان المُحدد',
+    shareBtnLabel:'📤 مشاركة', shareText:'وصلت للتو إلى لقب {title} (الذكاء {iq}، المرحلة {level}) في Mind Gap! 🧠 هل يمكنك التفوق عليّ؟', shareCopied:'تم النسخ! يمكنك لصقه في أي مكان.',
+    rateModalTitle:'⭐ هل يعجبك Mind Gap؟', rateModalMsg:'تقييم سريع على Play Store يساعدنا كثيراً!', rateNowBtn:'⭐ قيّم الآن', rateLaterBtn:'لاحقاً', rateNeverBtn:'لا تسأل مرة أخرى', rateManualFallback:'تم نسخ رابط المتجر! الصقه في متصفحك لتقييمنا.',
+  },
+  ru:{
+    play:'Играть', champ:'Лига Чемпионов', rules:'Как играть', levelMap:'Карта уровней', streakDays:'дней подряд', privacyOptions:'Настройки конфиденциальности',
+    sub:'Умные Блоки • 255 уровней',
+    rulesTitle:'📜 Как играть',
+    rulesBody:`<b>Цель:</b> Разместите все фигуры так, чтобы пустой осталась только <b>целевая (красная) клетка</b>.<br><br>
+<b>Управление:</b><br>• <b>Нажмите</b> на фигуру → поворот (4 стороны + 4 зеркальные)<br>• <b>Удерживайте и тяните</b> → поставить на доску<br>• Нажмите на размещённую фигуру → убрать<br><br>
+<b>Уровни:</b><br>• 1–25: доска 5×5<br>• 26–61: доска 6×6<br>• 62–110: доска 7×7<br>• 111–174: доска 8×8<br>• 175–255: доска 9×9<br><br>
+<b>Подсказки:</b> 1 на 5×5, 2 на 6×6, 3 на 7×7, 4 на 8×8, 5 на 9×9. Посмотри рекламу — получи +1 подсказку!<br><br>
+<b>IQ и Титулы:</b> +1 IQ за уровень. Новый титул каждые 5 уровней!`,
+    lvl:'Уровень', target:'Цель', targetEnd:'клетка должна остаться пустой', tap:'Нажми → поворот',
+    hint:'💡 Подсказка', reset:'↺ Сброс', ad:'📺 Реклама и подсказка', prevLevel:'Пред.', nextLevel:'След.',
+    win:'🎉 Уровень пройден!', next:'Следующий уровень →', newTitle:'Новый титул',
+    hintOver:'💡 Подсказок нет — посмотри рекламу, чтобы получить ещё', hintUsedT:'💡 Подсказка',
+    adWait:'Реклама:', adDone:'Реклама окончена!', adClose:'✕ Закрыть и получить подсказку', adLoading:'Загрузка рекламы...', adFailed:'Не удалось показать рекламу, попробуйте снова', adNotReady:'Реклама ещё не готова, попробуйте через момент', adTimeoutFallback:'Сейчас нет рекламы — попробуй чуть позже', adHintEarned:'💡 +1 подсказка получена!', adClosedNoReward:'Реклама закрыта раньше времени — подсказка не начислена',
+    allDone:'🏆 Ты прошёл все 255 уровней!', empty:'клеток пусто — пустой должна быть только цель',
+    lbTitle:'🏆 Лига Чемпионов', lbEmpty:'Пока никого — будь первым!', close:'✕ Закрыть', rankUp:'подъём в рейтинге', rankDown:'падение в рейтинге', rankSame:'без изменений', rankUnavailable:'Рейтинг недоступен', rankLoading:'🏆 Обновление рейтинга...', rankEntered:'попал в рейтинг', newTitleLabel:'Новое звание получено!', currentTitleLabel:'Твоё звание', offlineRequired:'Для создания имени пользователя нужен интернет', nameTaken:'Это имя уже занято!', nameTooShort:'Минимум 3 символа', nameTooLong:'Максимум 16 символов', nameInvalidChars:'Только буквы, цифры и пробелы', setUsernameTitle:'👤 Задать Имя Пользователя', namePlaceholder:'напр: КорольУма42', startBtn:'Начать ▶', checkingBtn:'Проверка...', retryBtn:'⟳ Повторить', offlineMode:'Офлайн — очки, IQ и рейтинг отключены', backBtn:'◀ Назад', lbYourRank:'Вы #{rank} из {total} игроков',
+    score:'Очки', bonusHint:'Получена бонусная подсказка!', newUser:'Новый ник', newGame:'Новая игра', continueGame:'Продолжить', welcomeBack:'С возвращением', alreadySolved:'Уже решено — без очков', adSolvedNoReward:'Решено через рекламу — без очков и IQ', demoTitle:'Обучение', demoSub:'Посмотри, как играть', skipTutorial:'Пропустить', demoWelcome:'👋 Добро пожаловать! Посмотрим как это работает...', demoDrag:'👆 Удерживай и тяни фигуру на доску', demoComplete:'✅ Вот и всё! Теперь попробуй сам',
+    tutInteractiveSub:'Теперь твоя очередь — попробуй сам', tutRotateMsg:'👆 Нажми на фигуру, чтобы повернуть', tutDragMsg:'✋ Теперь перетащи её на доску', tutDoneMsg:'🎉 Отлично! У тебя получилось',
+    level1GuideHint:'👆 Нажми «Подсказка», чтобы разместить первую фигуру', level1GuideRotate:'👆 Нажми на фигуру, чтобы повернуть её в нужное положение', level1GuideDrag:'✋ Теперь перетащи эту фигуру на отмеченное место',
+    shareBtnLabel:'📤 Поделиться', shareText:'Я только что достиг звания {title} (IQ {iq}, Уровень {level}) в Mind Gap! 🧠 Сможешь меня превзойти?', shareCopied:'Скопировано! Можешь вставить куда угодно.',
+    rateModalTitle:'⭐ Нравится Mind Gap?', rateModalMsg:'Быстрая оценка в Play Store очень нам поможет!', rateNowBtn:'⭐ Оценить', rateLaterBtn:'Позже', rateNeverBtn:'Больше не спрашивать', rateManualFallback:'Ссылка на магазин скопирована! Вставь её в браузер, чтобы оценить нас.',
+  }
+};
+let LANG=localStorage_get('pz_lang')||'en';
+function T(k){return (I18N[LANG]&&I18N[LANG][k])||I18N.tr[k]||k;}
+
+function applyLang(){
+  updateOfflineBadge();
+  // Tanıtım/rehber mesaj kutusu şu an bir şey gösteriyorsa, dil değişince
+  // ONU DA doğru dile çevir — aksi hâlde eski dilde donmuş kalırdı.
+  if(typeof CURRENT_TUT_MSG_KEY!=='undefined' && CURRENT_TUT_MSG_KEY){
+    setTutMsg(CURRENT_TUT_MSG_KEY);
+  }
+  document.getElementById('shareResultBtn') && (document.getElementById('shareResultBtn').textContent=T('shareBtnLabel'));
+  document.getElementById('mmNewUserTxt') && (document.getElementById('mmNewUserTxt').textContent=T('newUser'));
+  document.getElementById('mmContinueTxt') && (document.getElementById('mmContinueTxt').textContent=T('continueGame'));
+  document.getElementById('mmNewGameTxt') && (document.getElementById('mmNewGameTxt').textContent=T('newGame'));
+  document.getElementById('mmChampTxt').textContent=T('champ');
+  document.getElementById('mmLevelMapTxt').textContent=T('levelMap');
+  document.getElementById('mapTitle').textContent='🗺️ '+T('levelMap');
+  document.getElementById('mmRulesTxt').textContent=T('rules');
+  document.getElementById('mmPrivacyTxt').textContent=T('privacyOptions');
+  document.getElementById('nameModalTitle').textContent=T('setUsernameTitle');
+  document.getElementById('nameInput').placeholder=T('namePlaceholder');
+  document.getElementById('nameBackBtn').textContent=T('backBtn');
+  document.getElementById('mmSub').textContent=T('sub');
+  document.getElementById('rulesTitle').innerHTML=T('rulesTitle');
+  document.getElementById('rulesBody').innerHTML=T('rulesBody');
+  document.getElementById('rulesCloseBtn').textContent=T('close');
+  updateStreakUI();
+  document.getElementById('lbCloseBtn').textContent=T('close');
+  document.getElementById('mapCloseBtn').textContent=T('close');
+  document.getElementById('hintBtn').textContent=T('hint');
+  document.getElementById('resetBtn').textContent=T('reset');
+  document.getElementById('prevBtnTxt').textContent=T('prevLevel');
+  document.getElementById('nextBtnTxt').textContent=T('nextLevel');
+  document.getElementById('solveBtn').innerHTML=T('ad');
+  document.getElementById('nextLvlBtn').textContent=T('next');
+  document.getElementById('adCloseBtn').textContent=T('adClose');
+  document.querySelector('#winOverlay h2').textContent=T('win');
+  document.getElementById('titleUpLabelTxt').textContent=T('newTitle');
+  document.querySelector('#lbModal h2').textContent=T('lbTitle');
+  document.getElementById('langSel').value=LANG;
+  if(typeof LEVEL!=='undefined') refreshLevelTexts();
+}
+
+function refreshLevelTexts(){
+  if(typeof demoActive!=='undefined' && demoActive) return; // demo modunda üzerine yazma
+  if(typeof tutorialInteractive!=='undefined' && tutorialInteractive) return; // interaktif Bölüm 0'da üzerine yazma
+  lvlBadge.textContent=`🎯 ${LEVEL+1}/${TOTAL_LEVELS}`;
+  subTxt.innerHTML=`${GRID}×${GRID} | ${T('target')}: <b style="color:#e04040">${CELL_NUM}</b> ${T('targetEnd')} | ${T('tap')}`;
+}
+
+// Menü butonları
+function refreshMenuButtons(){
+  const hasUser=!!USERNAME;
+  document.getElementById('mmContinue').style.display=hasUser?'flex':'none';
+  document.getElementById('mmNewGame').style.display=hasUser?'flex':'none';
+  const mu=document.getElementById('menuUserRow');
+  mu.innerHTML=hasUser?
+    (`${T('welcomeBack')}, ${escHtml(USERNAME)}!`+
+     `<br><span class="menuUserStats">🧠 IQ ${iqFor(EARNED_LEVEL)} • ${escHtml(titleFor(EARNED_LEVEL))} • ⭐ ${SCORE}</span>`)
+    : '';
+  updateStreakUI();
+
+  // GDPR/UMP: gizlilik tercihleri butonu sadece native köprü bunu gerektiriyorsa görünür.
+  const privacyBtn=document.getElementById('mmPrivacy');
+  try{
+    if(window.AndroidBridge && typeof window.AndroidBridge.isPrivacyOptionsRequired==='function'){
+      privacyBtn.style.display=window.AndroidBridge.isPrivacyOptionsRequired()?'flex':'none';
+    } else {
+      privacyBtn.style.display='none';
+    }
+  }catch(e){
+    privacyBtn.style.display='none';
+  }
+}
+
+document.getElementById('mmNewUser').onclick=async()=>{
+  document.getElementById('mainMenu').classList.remove('show');
+  const res=await askUsername();
+  if(res && res.cancelled){
+    document.getElementById('mainMenu').classList.add('show');
+    refreshMenuButtons();
+    return;
+  }
+  if(isNewPlayerDemoNeeded()){
+    playIntroDemo();
+  } else {
+    loadLevel();
+    document.getElementById('mainMenu').classList.add('show');
+    refreshMenuButtons();
+  }
+};
+document.getElementById('mmContinue').onclick=()=>{
+  document.getElementById('mainMenu').classList.remove('show');
+};
+document.getElementById('mmNewGame').onclick=()=>{
+  resetLocalPlayerState(); // LEVEL, MAX_LEVEL, SCORE, COMPLETED_LEVELS, BONUS_HINTS — hepsini sıfırlar
+  document.getElementById('mainMenu').classList.remove('show');
+  loadLevel();
+};
+document.getElementById('mmChamp').onclick=()=>{ showLeaderboard(); };
+document.getElementById('mmLevelMap').onclick=()=>{ showLevelMap(); };
+document.getElementById('soundToggleBtn').onclick=toggleSound;
+document.getElementById('hapticToggleBtn').onclick=toggleHaptic;
+document.getElementById('mmRules').onclick=()=>{
+  document.getElementById('rulesModal').classList.add('show');
+};
+document.getElementById('mmPrivacy').onclick=()=>{
+  if(window.AndroidBridge && typeof window.AndroidBridge.showPrivacyOptionsForm==='function'){
+    window.AndroidBridge.showPrivacyOptionsForm();
+  }
+};
+document.getElementById('rulesCloseBtn').onclick=()=>{
+  document.getElementById('rulesModal').classList.remove('show');
+};
+document.getElementById('langSel').onchange=e=>{
+  LANG=e.target.value;
+  localStorage_set('pz_lang',LANG);
+  applyLang();
+  refreshMenuButtons();
+};
+document.getElementById('homeBtn').onclick=()=>{
+  endAdSession();
+  document.getElementById('mainMenu').classList.add('show');
+  refreshMenuButtons();
+};
+
+window.addEventListener('resize',()=>{setupLayout();drawGrid();renderPlaced();buildTray();});
+loadLevel();
+applyLang();
+updateScoreBadge();
+refreshMenuButtons();
+updateSoundToggleUI();
+updateHapticToggleUI();
+checkStreakValidity();
+updateStreakUI();
+
+if(USERNAME){ updateUserTag(); saveScore(); }
+
+// İlk açılışta gösterilecek kullanıcı adı ekranından ÖNCE bağlantıyı
+// kontrol eder; offline ise isim girişini gizleyip net bir "internet
+// gerekli" mesajıyla "Tekrar Dene" döngüsüne sokar. Bağlantı sağlanınca
+// normal (zorunlu) askUsername(true) akışına geçer.
+async function waitForOnlineThenAskUsername(){
+  const modal=document.getElementById('nameModal');
+  const input=document.getElementById('nameInput');
+  const err=document.getElementById('nameErr');
+  const okBtn=document.getElementById('nameOkBtn');
+  const backBtn=document.getElementById('nameBackBtn');
+
+  modal.classList.add('show');
+  backBtn.style.display='none';
+  input.style.display='none'; // bağlantı sağlanana kadar isim girişi gizli
+  err.textContent='';
+  err.classList.remove('offlineErr');
+  okBtn.disabled=true;
+  okBtn.textContent=T('checkingBtn');
+
+  let online=await checkOnline();
+  while(!online){
+    err.textContent=T('offlineRequired');
+    err.classList.add('offlineErr');
+    okBtn.disabled=false;
+    okBtn.textContent=T('retryBtn');
+    await new Promise(resolve=>{
+      okBtn.onclick=()=>{
+        okBtn.disabled=true;
+        okBtn.textContent=T('checkingBtn');
+        resolve();
+      };
+    });
+    online=await checkOnline();
+  }
+
+  input.style.display='';
+  err.textContent='';
+  err.classList.remove('offlineErr');
+  return askUsername(true);
+}
+
+// ── ZORUNLU İLK AÇILIŞ: kullanıcı adı ekranı ──
+// Uygulama GERÇEKTEN ilk kez açılıyorsa (bu cihazda daha önce hiç
+// işlenmemişse), ana menü yerine DOĞRUDAN ve ATLANAMAZ şekilde kullanıcı
+// adı ekranını göster. Kullanıcı adı oluşturulunca ana menüye geçilir.
+// Bu bayrak SADECE BİR KEZ tetiklenir — daha sonra "Yeni Oyun" ile anonim
+// oynayan dönen kullanıcılar bu ekranla tekrar KARŞILAŞMAZ.
+// İnternet bağlantısı ZORUNLUDUR (offline kullanıcı adı oluşturulamaz) ve
+// registerUser() zaten her kullanıcı adının benzersiz olmasını (Firestore'da
+// 'user:<isim>' dokümanı üzerinden) garanti eder.
+(async function handleFirstEverOpen(){
+  if(localStorage_get('pz_first_open_handled')) return; // zaten işlenmiş, hiçbir şey yapma
+  localStorage_set('pz_first_open_handled','1');
+  if(USERNAME) return; // bir şekilde zaten kullanıcı adı varsa (ör. eski veri) atla
+
+  document.getElementById('mainMenu').classList.remove('show');
+
+  // ÖNEMLİ: kullanıcı adı ekranından BİLE önce dil seçtiriyoruz. Aksi
+  // hâlde LANG varsayılan olarak 'en' kalıyordu ve kullanıcı adı ekranı,
+  // tanıtım, Bölüm 0 ve Bölüm 1 rehberi — hepsi kullanıcı ana menüye
+  // ulaşıp dili DEĞİŞTİRENE kadar İngilizce kalıyordu.
+  if(!localStorage_get('pz_lang')){
+    await askLanguagePick();
+  }
+
+  // Kullanıcı adı ekranındaki "Geri" tuşuna basılırsa (res.cancelled),
+  // dil menüsüne DÖNÜLÜR (kullanıcı dilini değiştirmek istemiş olabilir),
+  // sonra kullanıcı adı TEKRAR sorulur. Kullanıcı adı olmadan devam
+  // edilemez — bu yüzden döngü sadece başarıyla tamamlanınca kırılır.
+  let res;
+  while(true){
+    res = await waitForOnlineThenAskUsername();
+    if(res && res.cancelled){
+      await askLanguagePick();
+      continue;
+    }
+    break;
+  }
+
+  logAnalyticsEvent('first_open_username_created', {});
+  // ÖNEMLİ: mmNewUser'daki normal akışla AYNI mantık — kullanıcı adı
+  // oluşturulunca demo/Bölüm 0 tanıtımı (varsa) tetiklenmeli. Önceki sürümde
+  // bu kontrol unutulmuştu, doğrudan ana menüye atlıyordu — tanıtım ve
+  // Bölüm 0 hiç görünmüyordu.
+  if(isNewPlayerDemoNeeded()){
+    playIntroDemo();
+  } else {
+    document.getElementById('mainMenu').classList.add('show');
+    refreshMenuButtons();
+  }
+})();
+
+// Bağlantı durumunu başlangıçta ve periyodik olarak kontrol et
+// (offline göstergesi ve bir sonraki bölüm-sonu davranışı için).
+checkOnline();
+setInterval(checkOnline, 20000);
+
+// Service Worker kaydı — offline erişim ve APK/TWA uyumluluğu için
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('SW kayıt hatası:',e));
+  });
+}
+</script>
+</body>
+</html>
