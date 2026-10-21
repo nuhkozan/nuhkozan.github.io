@@ -106,8 +106,10 @@ th{color:var(--mu);font-weight:600}
   var nf = new Intl.NumberFormat("tr-TR");
   var token = null, timer = null;
 
-  function store(v){ try{ if(v) localStorage.setItem(KEY,v); else localStorage.removeItem(KEY); }catch(e){} }
-  function load(){ try{ return localStorage.getItem(KEY); }catch(e){ return null; } }
+  // Oturum anahtarı sekme kapanınca silinsin (sessionStorage); eski kalıcı kayıt temizlenir.
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  function store(v){ try{ if(v) sessionStorage.setItem(KEY,v); else sessionStorage.removeItem(KEY); }catch(e){} }
+  function load(){ try{ return sessionStorage.getItem(KEY); }catch(e){ return null; } }
 
   function show(which){ $("login").hidden = which !== "login"; $("app").hidden = which !== "app"; }
   function usd(v,d){ return "$" + Number(v||0).toFixed(d); }
