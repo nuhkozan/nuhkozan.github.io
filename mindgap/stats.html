@@ -81,7 +81,7 @@ function lt(field,ms){ return {fieldFilter:{field:{fieldPath:field},op:'LESS_THA
 function and(...f){ const x=f.filter(Boolean); return x.length===1?x[0]:{compositeFilter:{op:'AND',filters:x}}; }
 async function post(path,body){
   const r=await fetch(BASE+path+'?key='+KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error('Firestore '+r.status+' '+m); }
+  if(!r.ok){ let m=''; try{ const j=await r.json(); const e=Array.isArray(j)?(j[0]&&j[0].error):j.error; m=e?(e.status||'')+' '+(e.message||''):''; }catch(e){} throw new Error('Firestore '+r.status+' '+m+' ['+path+']'); }
   return r.json();
 }
 async function aggregate(where,aggs){
@@ -104,25 +104,28 @@ function playerRows(list,tbodyId,emptyId){
   $(emptyId).style.display='none';
   tb.innerHTML=list.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+fmtTime(e.t)+'</td><td>'+escHtml(e.score??'-')+'</td><td>'+escHtml(e.iq??'-')+'</td></tr>').join('');
 }
+const ERRS=[];
+const sf=(name,p,dflt)=>p.catch(e=>{ ERRS.push(name+': '+(e.message||e)); return dflt; });
 async function collect(){
+  ERRS.length=0;
   const now=Date.now(), DAY=86400000;
   const ts=new Date(); ts.setHours(0,0,0,0); const tMs=ts.getTime(), yMs=tMs-DAY;
   const [tot,a1,a7,a30,avg,today,yest,top]=await Promise.all([
-    count(null), count(gte('t',now-DAY)), count(gte('t',now-7*DAY)), count(gte('t',now-30*DAY)),
-    aggregate(null,[{alias:'iq',avg:{field:{fieldPath:'iq'}}},{alias:'sc',avg:{field:{fieldPath:'score'}}}]),
-    query({where:gte('t',tMs),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),
-    query({where:and(gte('t',yMs),lt('t',tMs)),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),
-    query({orderBy:[{field:{fieldPath:'score'},direction:'DESCENDING'}],limit:15})
+    sf('toplam',count(null),0), sf('1g',count(gte('t',now-DAY)),0), sf('7g',count(gte('t',now-7*DAY)),0), sf('30g',count(gte('t',now-30*DAY)),0),
+    sf('ortalama',aggregate(null,[{alias:'iq',avg:{field:{fieldPath:'iq'}}},{alias:'sc',avg:{field:{fieldPath:'score'}}}]),{}),
+    sf('bugun',query({where:gte('t',tMs),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),[]),
+    sf('dun',query({where:and(gte('t',yMs),lt('t',tMs)),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),[]),
+    sf('en-yuksek',query({orderBy:[{field:{fieldPath:'score'},direction:'DESCENDING'}],limit:15}),[])
   ]);
   const edges=[0,1,2,4,8,15,31]; const labels=['Bugün','Dün','2-3 gün','4-7 gün','8-14 gün','15-30 gün','30+ gün'];
-  const cum=await Promise.all(edges.map(d=>count(gte('t',now-d*DAY)))); // d günden yeni olanlar (kümülatif)
+  const cum=await Promise.all(edges.map(d=>sf('dagilim'+d,count(gte('t',now-d*DAY)),0))); // d günden yeni olanlar (kümülatif)
   // cum[k] = son edges[k] gün içinde olmayanlar HARİÇ değil; bu yüzden: eskiler = tot - cum
   const bucket=[]; 
   // aktif ≤ d gün: count(t >= now-d*DAY). edges[0]=0 → t>=now → 0 kişi (gelecek); bölmeler için ardışık fark:
   const within=[0,cum[1],cum[2],cum[3],cum[4],cum[5],cum[6]]; // 0 gün: yok; 1,2,4,8,15,31 gün içinde
   const rows=[ {label:labels[0],count:within[1]}, {label:labels[1],count:within[2]-within[1]}, {label:labels[2],count:within[3]-within[2]},
     {label:labels[3],count:within[4]-within[3]}, {label:labels[4],count:within[5]-within[4]}, {label:labels[5],count:within[6]-within[5]}, {label:labels[6],count:tot-within[6]} ];
-  return {at:now,tot,a1,a7,a30,iq:avg.iq,sc:avg.sc,today,yest,top,rows};
+  return {at:now,tot,a1,a7,a30,iq:(avg&&avg.iq!=null)?avg.iq:null,sc:(avg&&avg.sc!=null)?avg.sc:null,errs:ERRS.slice(),today,yest,top,rows};
 }
 function render(d){
   $('totalUsers').textContent=d.tot; $('active1d').textContent=d.a1; $('active7d').textContent=d.a7; $('active30d').textContent=d.a30;
@@ -130,7 +133,7 @@ function render(d){
   playerRows(d.today,'todayTable','todayEmpty'); playerRows(d.yest,'yesterdayTable','yesterdayEmpty');
   bars($('activityBars'),d.rows);
   $('topTable').innerHTML=d.top.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.earnedLevel??'-')+'</td><td>'+escHtml(e.iq??'-')+'</td><td>'+escHtml(e.score??'-')+'</td></tr>').join('');
-  $('stamp').textContent='Hesaplanma: '+new Date(d.at).toLocaleString('tr-TR')+' (5 dakika önbellek)';
+  $('stamp').textContent='Hesaplanma: '+new Date(d.at).toLocaleString('tr-TR')+' (5 dakika önbellek)'+((d.errs&&d.errs.length)?' — HATALAR: '+d.errs.join(' | '):'');
   statusEl.style.display='none'; $('report').style.display='block';
 }
 async function run(){
@@ -138,7 +141,7 @@ async function run(){
     let cached=null; try{ cached=JSON.parse(sessionStorage.getItem('mg_stats_v1')||'null'); }catch(e){}
     if(cached&&Date.now()-cached.at<300000){ render(cached); return; }
     const d=await collect();
-    try{ sessionStorage.setItem('mg_stats_v1',JSON.stringify(d)); }catch(e){}
+    if(!(d.errs&&d.errs.length)){ try{ sessionStorage.setItem('mg_stats_v1',JSON.stringify(d)); }catch(e){} }
     render(d);
   }catch(err){ statusEl.innerHTML='<span class="err">Hata: '+escHtml(String(err.message||err))+'</span>'; }
 }
