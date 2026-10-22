@@ -240,7 +240,7 @@ function escHtml(s){
 // Bu bir caydırıcıdır: sayfayı rastgele açanı engeller. Veri zaten oyunun kendi
 // bağlantısıyla okunabilir; asıl koruma Firestore kurallarındadır.
 // PASS_HASH boşken sayfa "şifre belirleme" modunda açılır ve üretilen özeti gösterir.
-const PASS_HASH = "";
+const PASS_HASH = "ab5bfe78444b5db95c176110e9cce453ec8da711cd17e9fb356d64772fae2ed1";
 const SALT = "mindgap-stats-v1";
 async function hashPw(p){
   const enc = new TextEncoder();
