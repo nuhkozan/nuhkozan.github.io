@@ -1446,8 +1446,9 @@ async function checkWin(){
   (async()=>{
     let oldLbEntries=[], oldLbRank=null;
     try{
-      oldLbEntries=await fetchLeaderboardEntries();
-      oldLbRank=rankOf(oldLbEntries,USERNAME);
+      const oldSnap=await lbSnapshot();
+      oldLbEntries=oldSnap.entries;
+      oldLbRank=oldSnap.rank;
     }catch(e){ oldLbEntries=[]; oldLbRank=null; }
 
     // İki ayrı puan yazma (bölüm ödülü + ünvan bonusu) yerine TEK Firestore
@@ -2790,6 +2791,13 @@ async function saveScore(){
     // bir metin kalmaz (önceki "TR/EN karışık ünvan" hatasının kök nedeni buydu).
     const data=JSON.stringify({name:USERNAME,iq,score:SCORE,level:LEVEL,earnedLevel:EARNED_LEVEL,title:titleFor(EARNED_LEVEL),t:Date.now()});
     await sSet('score:'+nameKey(USERNAME),data,true);
+    // v2: yeni, sıralanabilir 'scores' koleksiyonuna da yaz (ayrı try — biri hata verirse diğeri etkilenmez)
+    try{
+      await db.collection('scores').doc(nameKey(USERNAME)).set({
+        name:USERNAME, iq:Number(iq)||0, score:Math.floor(SCORE)||0,
+        level:Math.floor(LEVEL)||0, earnedLevel:Math.floor(EARNED_LEVEL)||0, t:Date.now()
+      });
+    }catch(e2){ /* sessizce vazgeç */ }
   }catch(e){
     // Offline — skor merkezi tabloya yazılamadı, sessizce vazgeç (yerel ilerleme etkilenmez)
   }
@@ -2886,36 +2894,65 @@ async function askUsername(forced){
   });
 }
 
-// ── Liderlik tablosu ──
-async function fetchLeaderboardEntries(){
-  // GEÇİCİ BAKIM (22 Ekim 2026): tüm skorları çekmek Firestore günlük okuma kotasını bitiriyor.
-  // Yeni, hafif sıralama sistemi hazır olana kadar tam çekim kapalı. Skor KAYDI etkilenmez.
-  throw new Error('lb-paused');
-  // ÖNEMLİ: önceki sürüm önce tüm 'score:*' doküman ID'lerini çekiyor, SONRA
-  // her birini TEK TEK ve SIRAYLA (await ile) yeniden çekiyordu — 116 oyuncu
-  // varsa 116 ayrı ağ gidiş-dönüşü, art arda! Bu, "2-3 dakika" bekleme
-  // şikayetinin gerçek kök nedeniydi. Firestore'un aralık sorgusu zaten TÜM
-  // doküman verisini TEK istekte döndürüyor — bunu doğrudan kullanıyoruz.
-  const prefix='score:';
-  const snap=await db.collection('shared_kv')
-    .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
-    .where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff')
-    .get();
-  const entries=[];
-  snap.docs.forEach(doc=>{
-    try{
-      const raw=doc.data().value;
-      if(!raw) return;
-      const d=JSON.parse(raw);
-      if(d && d.name) entries.push(d);
-    }catch(e){}
+// ── Liderlik tablosu (v2) ──
+// Artık TÜM skorları çekmiyoruz. Yeni 'scores' koleksiyonunda küçük sorgular:
+// ilk 10, oyuncunun çevresi (±3), son 5 ve sayım (aggregation). ~40 okuma/açılış.
+const FS_BASE='https://firestore.googleapis.com/v1/projects/'+firebaseConfig.projectId+'/databases/(default)/documents';
+async function fsCount(minExclusive){
+  const sq={from:[{collectionId:'scores'}]};
+  if(minExclusive!==null&&minExclusive!==undefined){
+    sq.where={fieldFilter:{field:{fieldPath:'score'},op:'GREATER_THAN',value:{integerValue:String(Math.floor(minExclusive))}}};
+  }
+  const r=await fetch(FS_BASE+':runAggregationQuery?key='+encodeURIComponent(firebaseConfig.apiKey),{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({structuredAggregationQuery:{structuredQuery:sq,aggregations:[{alias:'c',count:{}}]}})
   });
-  entries.sort((a,b)=>(b.score||0)-(a.score||0));
-  return entries;
+  if(!r.ok) throw new Error('count '+r.status);
+  const j=await r.json();
+  const f=j&&j[0]&&j[0].result&&j[0].result.aggregateFields&&j[0].result.aggregateFields.c;
+  return f?(parseInt(f.integerValue,10)||0):0;
+}
+function lbRows(snap){ return snap.docs.map(d=>d.data()).filter(x=>x&&x.name); }
+async function lbTop(n){
+  return lbRows(await db.collection('scores').orderBy('score','desc').limit(n).get());
+}
+async function lbBottom(n){
+  return lbRows(await db.collection('scores').orderBy('score','asc').limit(n).get()).reverse();
+}
+// Oyuncunun sırası + üstündeki/altındaki komşular. Kaydı yoksa null.
+async function lbMe(around){
+  if(!USERNAME) return null;
+  const mine=await db.collection('scores').doc(nameKey(USERNAME)).get();
+  if(!mine.exists) return null;
+  const entry=mine.data();
+  const myScore=Math.floor(Number(entry.score)||0);
+  const [higher,aboveSnap,belowSnap]=await Promise.all([
+    fsCount(myScore),
+    db.collection('scores').where('score','>',myScore).orderBy('score','asc').limit(around).get(),
+    db.collection('scores').where('score','<',myScore).orderBy('score','desc').limit(around).get()
+  ]);
+  const rank=higher+1;
+  const above=lbRows(aboveSnap).reverse().map((e,i,arr)=>({rank:rank-(arr.length-i),entry:e}));
+  const below=lbRows(belowSnap).map((e,i)=>({rank:rank+1+i,entry:e}));
+  return {rank,entry,above,below};
+}
+// Sıra animasyonu için hafif görüntü: seyrek dizi (yalnızca bilinen sıralar dolu).
+async function lbSnapshot(){
+  const me=await lbMe(2);
+  const entries=[];
+  if(!me) return {entries,rank:null};
+  entries[me.rank-1]=me.entry;
+  me.above.forEach(x=>{entries[x.rank-1]=x.entry;});
+  me.below.forEach(x=>{entries[x.rank-1]=x.entry;});
+  return {entries,rank:me.rank};
+}
+async function fetchLeaderboardView(){
+  const [top,bottom,total,me]=await Promise.all([lbTop(10),lbBottom(5),fsCount(null),lbMe(3)]);
+  return {top,bottom,total,me};
 }
 
 function rankOf(entries,name){
-  const i=entries.findIndex(e=>e.name===name);
+  const i=entries.findIndex(e=>e&&e.name===name);
   return i<0?null:i+1; // 1-index sıra; bulunamazsa null
 }
 
@@ -2925,15 +2962,15 @@ async function showLeaderboard(){
   modal.classList.add('show');
   list.innerHTML='<p style="text-align:center;color:#607080">...</p>';
 
-  let entries=[];
+  let view;
   try{
-    entries=await fetchLeaderboardEntries();
+    view=await fetchLeaderboardView();
   }catch(e){
-    list.innerHTML=`<p style="text-align:center;color:#ff8a4a">🛠️ ${T('rankUnavailable')}</p>`;
+    list.innerHTML=`<p style="text-align:center;color:#ff8a4a">📡 ${T('offlineMode')}</p>`;
     return;
   }
 
-  if(!entries.length){
+  if(!view.top.length){
     list.innerHTML=`<p style="text-align:center;color:#607080">${T('lbEmpty')}</p>`;
     return;
   }
@@ -2944,8 +2981,6 @@ async function showLeaderboard(){
     row.className='lbRow'+(d.name===USERNAME?' me':'');
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
     // Ünvan HER ZAMAN görüntüleyen kullanıcının GÜNCEL dilinde hesaplanır
-    // (kaydedilen d.title metnine güvenilmez — bu, farklı dillerdeki
-    // oyuncuların ünvanlarının karışık görünmesine yol açan hataydı).
     const earnedLvl=(typeof d.earnedLevel==='number')?d.earnedLevel:(Number(d.level)||0);
     const titleTxt=titleFor(earnedLvl);
     row.innerHTML=`<span class="rank">${medal}</span>
@@ -2961,42 +2996,37 @@ async function showLeaderboard(){
     list.appendChild(sep);
   }
 
-  const TOP_N=10, AROUND=3, BOTTOM_N=5;
-  const meRank=rankOf(entries,USERNAME); // 1-index veya null
+  const TOP_N=10;
+  const me=view.me;
 
-  // 1) EN ÜSTTE: kullanıcının kendi sırası — kalın/belirgin
-  if(meRank){
+  // 1) EN ÜSTTE: kullanıcının kendi sırası
+  if(me){
     const rankNote=document.createElement('div');
     rankNote.className='lbMyRankNote';
-    rankNote.textContent=T('lbYourRank').replace('{rank}',meRank).replace('{total}',entries.length);
+    rankNote.textContent=T('lbYourRank').replace('{rank}',me.rank).replace('{total}',view.total);
     list.appendChild(rankNote);
   }
 
   // 2) Sabit Top 10
-  const topCount=Math.min(TOP_N,entries.length);
-  for(let i=0;i<topCount;i++){
-    list.appendChild(buildRow(entries[i],i));
-  }
-  let lastShownRank=topCount; // 1-index, şu ana kadar gösterilen son sıra
+  view.top.forEach((d,i)=>list.appendChild(buildRow(d,i)));
+  let lastShownRank=view.top.length;
 
   // 3) Kullanıcının sırası ±3 (Top 10 dışındaysa)
-  if(meRank && meRank>TOP_N){
-    appendSeparator();
-    const lo=Math.max(TOP_N+1,meRank-AROUND);
-    const hi=Math.min(entries.length,meRank+AROUND);
-    for(let r=lo;r<=hi;r++){
-      list.appendChild(buildRow(entries[r-1],r-1));
+  if(me && me.rank>TOP_N){
+    const block=[].concat(me.above,[{rank:me.rank,entry:me.entry}],me.below).filter(x=>x.rank>lastShownRank);
+    if(block.length){
+      if(block[0].rank>lastShownRank+1) appendSeparator();
+      block.forEach(x=>list.appendChild(buildRow(x.entry,x.rank-1)));
+      lastShownRank=block[block.length-1].rank;
     }
-    lastShownRank=hi;
   }
 
-  // 4) EN ALTTA: genel sıralamanın son 5'i (zaten gösterilenlerle çakışmıyorsa)
-  const bottomLo=Math.max(1,entries.length-BOTTOM_N+1);
-  if(entries.length>lastShownRank){
-    if(bottomLo>lastShownRank){ appendSeparator(); } // araya boşluk varsa ayırıcı koy
-    for(let r=Math.max(bottomLo,lastShownRank+1);r<=entries.length;r++){
-      list.appendChild(buildRow(entries[r-1],r-1));
-    }
+  // 4) EN ALTTA: son 5
+  const bottomStart=view.total-view.bottom.length+1;
+  const bottomRows=view.bottom.map((e,i)=>({rank:bottomStart+i,entry:e})).filter(x=>x.rank>lastShownRank);
+  if(bottomRows.length){
+    if(bottomRows[0].rank>lastShownRank+1) appendSeparator();
+    bottomRows.forEach(x=>list.appendChild(buildRow(x.entry,x.rank-1)));
   }
 }
 document.getElementById('lbCloseBtn').onclick=()=>{
@@ -3095,9 +3125,8 @@ async function playRankShiftAnimation(oldEntries, oldRank){
 
   if(!USERNAME){ panel.classList.remove('show'); return; }
 
-  let newEntries=[];
-  try{ newEntries=await fetchLeaderboardEntries(); }catch(e){ newEntries=oldEntries||[]; }
-  const newRank=rankOf(newEntries,USERNAME);
+  let newEntries=[], newRank=null;
+  try{ const ns=await lbSnapshot(); newEntries=ns.entries; newRank=ns.rank; }catch(e){ newEntries=oldEntries||[]; newRank=oldRank; }
 
   if(newRank===null){
     // Liderlik tablosu okunamadı / kayıt bulunamadı — yine de bir mesaj göster
@@ -3118,7 +3147,8 @@ async function playRankShiftAnimation(oldEntries, oldRank){
 
   // Görsel pencere: eski sıranın etrafındaki birkaç satırı göster (kaymayı gözlemleyebilmek için)
   const windowStart=Math.max(1, Math.min(effectiveOldRank,newRank)-1);
-  const windowEnd=Math.min(newEntries.length, Math.max(effectiveOldRank,newRank)+1);
+  let windowEnd=Math.min(Math.max(effectiveOldRank,newRank)+1, Math.max(newEntries.length, (oldEntries||[]).length));
+  if(windowEnd-windowStart>6) windowEnd=windowStart+6; // çok büyük sıçramada pencereyi sınırla
 
   // Eski listedeki görünür satırları oluştur (başlangıç konumları = eski sıra)
   const rowEls={};
