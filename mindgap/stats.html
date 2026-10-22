@@ -110,9 +110,10 @@ async function collect(){
   ERRS.length=0;
   const now=Date.now(), DAY=86400000;
   const ts=new Date(); ts.setHours(0,0,0,0); const tMs=ts.getTime(), yMs=tMs-DAY;
-  const [tot,a1,a7,a30,avg,today,yest,top]=await Promise.all([
+  const [tot,a1,a7,a30,avgI,avgS,today,yest,top]=await Promise.all([
     sf('toplam',count(null),0), sf('1g',count(gte('t',now-DAY)),0), sf('7g',count(gte('t',now-7*DAY)),0), sf('30g',count(gte('t',now-30*DAY)),0),
-    sf('ortalama',aggregate(null,[{alias:'iq',avg:{field:{fieldPath:'iq'}}},{alias:'sc',avg:{field:{fieldPath:'score'}}}]),{}),
+    sf('ortIQ',aggregate(null,[{alias:'iq',avg:{field:{fieldPath:'iq'}}}]),{}),
+    sf('ortPuan',aggregate(null,[{alias:'sc',avg:{field:{fieldPath:'score'}}}]),{}),
     sf('bugun',query({where:gte('t',tMs),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),[]),
     sf('dun',query({where:and(gte('t',yMs),lt('t',tMs)),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),[]),
     sf('en-yuksek',query({orderBy:[{field:{fieldPath:'score'},direction:'DESCENDING'}],limit:15}),[])
@@ -125,7 +126,7 @@ async function collect(){
   const within=[0,cum[1],cum[2],cum[3],cum[4],cum[5],cum[6]]; // 0 gün: yok; 1,2,4,8,15,31 gün içinde
   const rows=[ {label:labels[0],count:within[1]}, {label:labels[1],count:within[2]-within[1]}, {label:labels[2],count:within[3]-within[2]},
     {label:labels[3],count:within[4]-within[3]}, {label:labels[4],count:within[5]-within[4]}, {label:labels[5],count:within[6]-within[5]}, {label:labels[6],count:tot-within[6]} ];
-  return {at:now,tot,a1,a7,a30,iq:(avg&&avg.iq!=null)?avg.iq:null,sc:(avg&&avg.sc!=null)?avg.sc:null,errs:ERRS.slice(),today,yest,top,rows};
+  return {at:now,tot,a1,a7,a30,iq:(avgI&&avgI.iq!=null)?avgI.iq:null,sc:(avgS&&avgS.sc!=null)?avgS.sc:null,errs:ERRS.slice(),today,yest,top,rows};
 }
 function render(d){
   $('totalUsers').textContent=d.tot; $('active1d').textContent=d.a1; $('active7d').textContent=d.a7; $('active30d').textContent=d.a30;
