@@ -28,9 +28,21 @@
   #status{color:#8fb8d0;font-size:.9rem}
   .note{font-size:.75rem;color:#607080;margin-top:6px;line-height:1.4}
   .err{color:#ff5060;font-weight:600}
+  .gate{max-width:360px;margin:12vh auto 0;text-align:center}
+  .gate input{width:100%;padding:12px;margin:12px 0;border-radius:10px;border:1px solid rgba(0,220,255,.35);background:#0b1522;color:#dff6ff;font-size:1rem}
+  .gate button{width:100%;padding:12px;border-radius:10px;border:0;background:#00c8ff;color:#021018;font-weight:700;font-size:1rem}
+  .gate code{display:block;word-break:break-all;background:#0b1522;padding:10px;border-radius:8px;font-size:.75rem;margin-top:10px;color:#ffd040;text-align:left}
 </style>
 </head>
 <body>
+  <div class="gate" id="gate" style="display:none">
+    <h1>🔒 MIND GAP — İstatistikler</h1>
+    <div class="sub" id="gateMsg">Devam etmek için şifreyi girin.</div>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Şifre">
+    <button id="pwBtn">Giriş</button>
+    <div id="gateOut"></div>
+  </div>
+  <div id="main" style="display:none">
   <h1>📊 MIND GAP — İstatistikler</h1>
   <div class="sub">shared_kv koleksiyonundan hesaplanan anlık özet (Firebase Analytics'ten BAĞIMSIZ, geriye dönük tahmini veri)</div>
   <div id="status">Yükleniyor…</div>
@@ -82,6 +94,7 @@
       </table>
     </section>
 
+  </div>
   </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
@@ -223,7 +236,37 @@ function escHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-run();
+// ── Şifre kapısı ────────────────────────────────────────────────
+// Bu bir caydırıcıdır: sayfayı rastgele açanı engeller. Veri zaten oyunun kendi
+// bağlantısıyla okunabilir; asıl koruma Firestore kurallarındadır.
+// PASS_HASH boşken sayfa "şifre belirleme" modunda açılır ve üretilen özeti gösterir.
+const PASS_HASH = "";
+const SALT = "mindgap-stats-v1";
+async function hashPw(p){
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(p), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', salt:enc.encode(SALT), iterations:200000, hash:'SHA-256'}, key, 256);
+  return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function startGate(){
+  const gate=document.getElementById('gate'), main=document.getElementById('main');
+  const pw=document.getElementById('pw'), btn=document.getElementById('pwBtn'), out=document.getElementById('gateOut');
+  gate.style.display='block';
+  const setup = !PASS_HASH;
+  if(setup){
+    document.getElementById('gateMsg').textContent='Şifre belirleme modu: yeni şifrenizi yazın, çıkan özeti (hash) dosyadaki PASS_HASH alanına yapıştırın.';
+    btn.textContent='Özeti üret';
+  }
+  async function go(){
+    const h = await hashPw(pw.value);
+    if(setup){ out.innerHTML='<code></code>'; out.firstChild.textContent=h; return; }
+    if(h===PASS_HASH){ gate.style.display='none'; main.style.display='block'; run(); }
+    else { out.innerHTML='<div class="err" style="margin-top:10px">Şifre yanlış.</div>'; pw.value=''; }
+  }
+  btn.onclick=go;
+  pw.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+}
+startGate();
 </script>
 </body>
 </html>
