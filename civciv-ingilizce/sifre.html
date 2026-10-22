@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Civciv - Şifre Belirle</title>
+<style>
+  :root{--bg:#070d14;--card:#0b1622;--line:#17314a;--ink:#e6f1ff;--mute:#8aa0b8;--accent:#6fe3ff;--good:#4ade80;--bad:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+  .box{max-width:360px;margin:60px auto}
+  h1{font-size:1.4rem;color:var(--accent);margin:0 0 6px}
+  p{color:var(--mute);font-size:.9rem;line-height:1.45}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#06101a;color:var(--ink);font-size:1rem;margin-bottom:10px}
+  button{width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#04202c;font-weight:800;font-size:1rem;cursor:pointer}
+  .msg{min-height:1.4em;margin:8px 0;font-size:.9rem}
+  .err{color:var(--bad)} .ok{color:var(--good)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>🐥 Şifre Belirle</h1>
+  <p id="info">Bu sayfa, e-postandaki kurtarma bağlantısıyla açılır. Panel girişi için yeni bir şifre belirle (en az 12 karakter).</p>
+  <div id="form" class="hidden">
+    <input id="p1" type="password" placeholder="Yeni şifre" autocomplete="new-password">
+    <input id="p2" type="password" placeholder="Yeni şifre (tekrar)" autocomplete="new-password">
+    <button id="go">Şifreyi kaydet</button>
+  </div>
+  <div id="msg" class="msg"></div>
+</div>
+<script>
+const SB_URL = 'https://elsfotlpczqyqlcxnudz.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsc2ZvdGxwY3pxeXFsY3hudWR6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3OTYxODUsImV4cCI6MjEwNjM3MjE4NX0.UAv9y-RVJ8_aOnIH-d19jqm2Ssizto5HtwQ941OiAgE';
+const $ = id => document.getElementById(id);
+function say(t, cls){ const m=$('msg'); m.className='msg '+(cls||''); m.textContent=t; }
+const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+const token = h.get('access_token');
+const type = h.get('type');
+const errDesc = h.get('error_description');
+// Bağlantıdaki anahtarı adres çubuğundan ve geçmişten hemen sil.
+try{ history.replaceState(null, '', location.pathname); }catch(e){}
+if(errDesc){
+  say('Bağlantı geçersiz veya süresi dolmuş. Supabase\'den yeni bir kurtarma e-postası iste.', 'err');
+} else if(!token || type !== 'recovery'){
+  say('Bu sayfa yalnızca e-postadaki kurtarma bağlantısıyla çalışır.', 'err');
+} else {
+  $('form').classList.remove('hidden');
+  $('go').onclick = async () => {
+    const a = $('p1').value, b = $('p2').value;
+    if(a.length < 12){ say('Şifre en az 12 karakter olmalı.', 'err'); return; }
+    if(a !== b){ say('İki şifre aynı değil.', 'err'); return; }
+    $('go').disabled = true; say('Kaydediliyor...', '');
+    try{
+      const r = await fetch(SB_URL + '/auth/v1/user', {
+        method: 'PUT',
+        headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
+        body: JSON.stringify({password: a})
+      });
+      if(r.ok){ $('form').classList.add('hidden'); say('Şifre kaydedildi. Artık panele bu şifreyle girebilirsin.', 'ok'); }
+      else {
+        let m=''; try{ m=(await r.json()).msg || ''; }catch(e){}
+        say('Kaydedilemedi' + (m ? ': ' + m : '') + '. Yeni bir kurtarma e-postası iste.', 'err'); $('go').disabled = false;
+      }
+    }catch(e){ say('Bağlantı hatası. Tekrar dene.', 'err'); $('go').disabled = false; }
+  };
+}
+</script>
+</body>
+</html>
