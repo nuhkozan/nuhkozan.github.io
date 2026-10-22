@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>KARPUZ — İstatistikler</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;background:#060b12;color:#dff6ff;
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif;min-height:100vh}
+  h1{font-size:1.3rem;color:#00e8ff;text-shadow:0 0 10px rgba(0,220,255,.5);margin:0 0 4px}
+  .sub{color:#8fb8d0;font-size:.85rem;margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:22px}
+  .card{background:rgba(0,180,255,.06);border:1px solid rgba(0,220,255,.25);
+    border-radius:12px;padding:14px}
+  .card .label{font-size:.72rem;color:#8fb8d0;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+  .card .value{font-size:1.6rem;font-weight:800;color:#ffd040;margin-top:4px}
+  section{margin-bottom:26px}
+  h2{font-size:1rem;color:#00e8ff;border-bottom:1px solid rgba(0,220,255,.2);padding-bottom:6px}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06)}
+  th{color:#8fb8d0;font-weight:600}
+  .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:.8rem}
+  .bar-label{width:90px;flex-shrink:0;color:#8fb8d0}
+  .bar-track{flex:1;background:rgba(255,255,255,.05);border-radius:4px;height:16px;position:relative;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,#00c8ff,#00ffcc);border-radius:4px}
+  .bar-count{width:36px;text-align:right;color:#dff6ff;font-weight:700}
+  #status{color:#8fb8d0;font-size:.9rem}
+  .note{font-size:.75rem;color:#607080;margin-top:6px;line-height:1.4}
+  .err{color:#ff5060;font-weight:600}
+  .gate{max-width:360px;margin:12vh auto 0;text-align:center}
+  .gate input{width:100%;padding:12px;margin:12px 0;border-radius:10px;border:1px solid rgba(0,220,255,.35);background:#0b1522;color:#dff6ff;font-size:1rem}
+  .gate button{width:100%;padding:12px;border-radius:10px;border:0;background:#00c8ff;color:#021018;font-weight:700;font-size:1rem}
+  .gate code{display:block;word-break:break-all;background:#0b1522;padding:10px;border-radius:8px;font-size:.75rem;margin-top:10px;color:#ffd040;text-align:left}
+</style>
+</head>
+<body>
+  <div class="gate" id="gate" style="display:none">
+    <h1>🔒 KARPUZ — İstatistikler</h1>
+    <div class="sub" id="gateMsg">Devam etmek için şifreyi girin.</div>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Şifre">
+    <button id="pwBtn">Giriş</button>
+    <div id="gateOut"></div>
+  </div>
+  <div id="main" style="display:none">
+  <h1>🍉 KARPUZ — İstatistikler</h1>
+  <div class="sub">Firebase skor tablosu, kayıtlı isimler ve meydan okumalardan hesaplanan anlık özet</div>
+  <div id="status">Yükleniyor…</div>
+  <div id="report" style="display:none">
+    <div class="grid">
+      <div class="card"><div class="label">Skor tablosundaki oyuncu</div><div class="value" id="totalPlayers">-</div></div>
+      <div class="card"><div class="label">Kayıtlı isim</div><div class="value" id="totalNames">-</div></div>
+      <div class="card"><div class="label">Son 24 saatte aktif</div><div class="value" id="active1d">-</div></div>
+      <div class="card"><div class="label">Son 7 günde aktif</div><div class="value" id="active7d">-</div></div>
+      <div class="card"><div class="label">Son 30 günde aktif</div><div class="value" id="active30d">-</div></div>
+      <div class="card"><div class="label">Ortalama puan</div><div class="value" id="avgScore">-</div></div>
+      <div class="card"><div class="label">Ortalama seviye</div><div class="value" id="avgLv">-</div></div>
+      <div class="card"><div class="label">Meydan okuma (toplam)</div><div class="value" id="chTotal">-</div></div>
+    </div>
+    <section>
+      <h2>⚔️ Meydan okumalar</h2>
+      <div id="chBars"></div>
+    </section>
+    <section>
+      <h2>🟢 Bugün oynayanlar</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>Seviye</th></tr></thead><tbody id="todayTable"></tbody></table>
+      <div class="note" id="todayEmpty" style="display:none">Bugün henüz kimse oynamamış.</div>
+    </section>
+    <section>
+      <h2>🔵 Dün oynayanlar</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>Seviye</th></tr></thead><tbody id="yesterdayTable"></tbody></table>
+      <div class="note" id="yesterdayEmpty" style="display:none">Dün kimse oynamamış.</div>
+      <div class="note">Not: "Bugün/Dün" cihazınızın yerel saatine göre takvim günüdür. Skor tablosu yalnız puan gönderen oyuncuları içerir; skor göndermeden oynayanlar görünmez.</div>
+    </section>
+    <section>
+      <h2>Son aktivite dağılımı (gün önce)</h2>
+      <div id="activityBars"></div>
+    </section>
+    <section>
+      <h2>En yüksek puanlı 15 oyuncu</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Seviye</th><th>Puan</th></tr></thead><tbody id="topTable"></tbody></table>
+    </section>
+  </div>
+  </div>
+
+<script>
+const FB_URL = 'https://karpuz-oyunu-default-rtdb.europe-west1.firebasedatabase.app';
+const statusEl = document.getElementById('status');
+const $ = id => document.getElementById(id);
+function escHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function getNode(name){
+  const r = await fetch(FB_URL + '/' + name + '.json');
+  if(!r.ok) throw new Error(name + ' okunamadı (' + r.status + ')');
+  return await r.json();
+}
+function fmtTime(ts){ if(!ts) return '-'; return new Date(ts).toLocaleString('tr-TR',{hour:'2-digit',minute:'2-digit'}); }
+function bars(el, rows){
+  const mx = Math.max(1, ...rows.map(r=>r.count));
+  el.innerHTML = rows.map(c => '<div class="bar-row"><div class="bar-label">'+escHtml(c.label)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(c.count/mx*100).toFixed(1)+'%"></div></div><div class="bar-count">'+c.count+'</div></div>').join('');
+}
+
+async function run(){
+  try{
+    const [lb, users, ch] = await Promise.all([getNode('leaderboard'), getNode('users').catch(()=>null), getNode('challenges').catch(()=>null)]);
+    const entries = lb && typeof lb==='object' ? Object.values(lb).filter(e=>e && e.name) : [];
+    if(!entries.length){ statusEl.innerHTML = '<span class="err">Skor tablosunda kayıt yok ya da erişim engellendi.</span>'; return; }
+    const now = Date.now(), DAY = 86400000;
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const tMs = todayStart.getTime(), yMs = tMs - DAY;
+    const todayP = entries.filter(e=>(e.t||0)>=tMs).sort((a,b)=>(b.t||0)-(a.t||0));
+    const yestP = entries.filter(e=>(e.t||0)>=yMs && (e.t||0)<tMs).sort((a,b)=>(b.t||0)-(a.t||0));
+    function rows(list, tbodyId, emptyId){
+      const tb = $(tbodyId);
+      if(!list.length){ $(emptyId).style.display='block'; tb.innerHTML=''; return; }
+      tb.innerHTML = list.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+fmtTime(e.t)+'</td><td>'+(e.score!=null?escHtml(e.score):'-')+'</td><td>'+(e.lv!=null?escHtml(e.lv):'-')+'</td></tr>').join('');
+    }
+    rows(todayP,'todayTable','todayEmpty'); rows(yestP,'yesterdayTable','yesterdayEmpty');
+
+    const act = d => entries.filter(e => (now-(e.t||0)) < d*DAY).length;
+    const avg = k => entries.reduce((s,e)=>s+(Number(e[k])||0),0)/entries.length;
+    $('totalPlayers').textContent = entries.length;
+    $('totalNames').textContent = users && typeof users==='object' ? Object.keys(users).length : '-';
+    $('active1d').textContent = act(1); $('active7d').textContent = act(7); $('active30d').textContent = act(30);
+    $('avgScore').textContent = Math.round(avg('score')); $('avgLv').textContent = avg('lv').toFixed(1);
+
+    const chList = ch && typeof ch==='object' ? Object.entries(ch).filter(([k,v])=>v && !k.endsWith('_response')).map(([k,v])=>v) : [];
+    $('chTotal').textContent = chList.length;
+    const st = s => chList.filter(c=>c.status===s).length;
+    bars($('chBars'), [{label:'Bekliyor',count:st('pending')},{label:'Kabul',count:st('accepted')},{label:'Reddedildi',count:st('rejected')}]);
+
+    const buckets = [['Bugün',d=>d<1],['Dün',d=>d>=1&&d<2],['2-3 gün',d=>d>=2&&d<4],['4-7 gün',d=>d>=4&&d<8],['8-14 gün',d=>d>=8&&d<15],['15-30 gün',d=>d>=15&&d<31],['30+ gün',d=>d>=31]];
+    bars($('activityBars'), buckets.map(([label,test])=>({label, count: entries.filter(e=>test((now-(e.t||0))/DAY)).length})));
+
+    const top = [...entries].sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,15);
+    $('topTable').innerHTML = top.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+(e.lv!=null?escHtml(e.lv):'-')+'</td><td>'+(e.score!=null?escHtml(e.score):'-')+'</td></tr>').join('');
+
+    statusEl.style.display='none'; $('report').style.display='block';
+  }catch(err){
+    statusEl.innerHTML = '<span class="err">Hata: '+escHtml(String(err.message||err))+'</span>';
+  }
+}
+
+// ── Şifre kapısı ────────────────────────────────────────────────
+// Bu bir caydırıcıdır: sayfayı rastgele açanı engeller. Veri zaten oyunun kendi
+// bağlantısıyla okunabilir; asıl koruma Firebase kurallarındadır.
+// PASS_HASH boşken sayfa "şifre belirleme" modunda açılır ve üretilen özeti gösterir.
+const PASS_HASH = "";
+const SALT = "karpuz-stats-v1";
+async function hashPw(p){
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(p), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2', salt:enc.encode(SALT), iterations:200000, hash:'SHA-256'}, key, 256);
+  return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function startGate(){
+  const gate=document.getElementById('gate'), main=document.getElementById('main');
+  const pw=document.getElementById('pw'), btn=document.getElementById('pwBtn'), out=document.getElementById('gateOut');
+  gate.style.display='block';
+  const setup = !PASS_HASH;
+  if(setup){
+    document.getElementById('gateMsg').textContent='Şifre belirleme modu: yeni şifrenizi yazın, çıkan özeti (hash) dosyadaki PASS_HASH alanına yapıştırın.';
+    btn.textContent='Özeti üret';
+  }
+  async function go(){
+    const h = await hashPw(pw.value);
+    if(setup){ out.innerHTML='<code></code>'; out.firstChild.textContent=h; return; }
+    if(h===PASS_HASH){ gate.style.display='none'; main.style.display='block'; run(); }
+    else { out.innerHTML='<div class="err" style="margin-top:10px">Şifre yanlış.</div>'; pw.value=''; }
+  }
+  btn.onclick=go;
+  pw.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+}
+startGate();
+</script>
+</body>
+</html>
