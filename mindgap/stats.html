@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title>MIND GAP — İstatistikler</title>
 <style>
   *{box-sizing:border-box}
@@ -36,18 +37,18 @@
 </head>
 <body>
   <div class="gate" id="gate" style="display:none">
-    <h1>🔒 MIND GAP — İstatistikler</h1>
+    <h1>🔒 MIND GAP</h1>
     <div class="sub" id="gateMsg">Devam etmek için şifreyi girin.</div>
     <input type="password" id="pw" autocomplete="current-password" placeholder="Şifre">
     <button id="pwBtn">Giriş</button>
     <div id="gateOut"></div>
   </div>
   <div id="main" style="display:none">
+
   <h1>📊 MIND GAP — İstatistikler</h1>
-  <div class="sub">shared_kv koleksiyonundan hesaplanan anlık özet (Firebase Analytics'ten BAĞIMSIZ, geriye dönük tahmini veri)</div>
+  <div class="sub">Yeni <b>scores</b> koleksiyonundan, sayım sorgularıyla hesaplanan özet (her açılış ~1-2 bin okuma; 5 dk önbellek)</div>
   <div id="status">Yükleniyor…</div>
   <div id="report" style="display:none">
-
     <div class="grid">
       <div class="card"><div class="label">Toplam kayıtlı kullanıcı</div><div class="value" id="totalUsers">-</div></div>
       <div class="card"><div class="label">Son 24 saatte aktif</div><div class="value" id="active1d">-</div></div>
@@ -56,186 +57,91 @@
       <div class="card"><div class="label">Ortalama IQ</div><div class="value" id="avgIq">-</div></div>
       <div class="card"><div class="label">Ortalama puan</div><div class="value" id="avgScore">-</div></div>
     </div>
-
-    <section>
-      <h2>🟢 Bugün oynayanlar</h2>
-      <table>
-        <thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>IQ</th></tr></thead>
-        <tbody id="todayTable"></tbody>
-      </table>
-      <div class="note" id="todayEmpty" style="display:none">Bugün henüz kimse oynamamış.</div>
-    </section>
-
-    <section>
-      <h2>🔵 Dün oynayanlar</h2>
-      <table>
-        <thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>IQ</th></tr></thead>
-        <tbody id="yesterdayTable"></tbody>
-      </table>
+    <section><h2>🟢 Bugün oynayanlar</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>IQ</th></tr></thead><tbody id="todayTable"></tbody></table>
+      <div class="note" id="todayEmpty" style="display:none">Bugün henüz kimse oynamamış.</div></section>
+    <section><h2>🔵 Dün oynayanlar</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Son aktif saat</th><th>Puan</th><th>IQ</th></tr></thead><tbody id="yesterdayTable"></tbody></table>
       <div class="note" id="yesterdayEmpty" style="display:none">Dün kimse oynamamış.</div>
-      <div class="note">Not: "Bugün/Dün", cihazınızın yerel saatine göre takvim günü sınırıyla (00:00-00:00) hesaplanır;
-      basit 24/48 saatlik kayan pencere değildir.</div>
-    </section>
-
-    <section>
-      <h2>Son aktivite dağılımı (gün önce)</h2>
-      <div id="activityBars"></div>
-      <div class="note">Not: Firestore'da "kayıt tarihi" alanı tutulmuyor, sadece "son güncelleme" (t) tutuluyor —
-      her bölüm tamamlandığında/uygulama açıldığında bu alan güncellenir. Bu grafik, kullanıcıların
-      en son NE ZAMAN aktif olduğunu gösterir; "hangi gün kaç yeni kullanıcı geldi" sorusuna kesin cevap veremez
-      (o veri artık Firebase Analytics ile bugünden itibaren toplanıyor).</div>
-    </section>
-
-    <section>
-      <h2>En yüksek puanlı 15 oyuncu</h2>
-      <table>
-        <thead><tr><th>#</th><th>İsim</th><th>Ünvan seviyesi (earnedLevel)</th><th>IQ</th><th>Puan</th></tr></thead>
-        <tbody id="topTable"></tbody>
-      </table>
-    </section>
-
+      <div class="note">Listeler en fazla 150 kişiyi gösterir (en son aktif olandan başlayarak). "Bugün/Dün" cihazınızın yerel takvim günüdür.</div></section>
+    <section><h2>Son aktivite dağılımı (gün önce)</h2><div id="activityBars"></div></section>
+    <section><h2>En yüksek puanlı 15 oyuncu</h2>
+      <table><thead><tr><th>#</th><th>İsim</th><th>Ünvan seviyesi</th><th>IQ</th><th>Puan</th></tr></thead><tbody id="topTable"></tbody></table></section>
+    <div class="note" id="stamp"></div>
   </div>
   </div>
-
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBMcuXyZBDCuZ8ZiqKsheh41LqUyWDU5b8",
-  authDomain: "mindgap-c51b7.firebaseapp.com",
-  databaseURL: "https://mindgap-c51b7-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "mindgap-c51b7",
-  storageBucket: "mindgap-c51b7.firebasestorage.app",
-  messagingSenderId: "712682738039",
-  appId: "1:712682738039:web:0ea244284184c36ebc5172",
-  measurementId: "G-H0QKEZ8WZ1"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-const statusEl = document.getElementById('status');
-
+const PROJECT='mindgap-c51b7', KEY='AIzaSyBMcuXyZBDCuZ8ZiqKsheh41LqUyWDU5b8';
+const BASE='https://firestore.googleapis.com/v1/projects/'+PROJECT+'/databases/(default)/documents';
+const $=id=>document.getElementById(id);
+const statusEl=$('status');
+function escHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function gte(field,ms){ return {fieldFilter:{field:{fieldPath:field},op:'GREATER_THAN_OR_EQUAL',value:{integerValue:String(Math.floor(ms))}}}; }
+function lt(field,ms){ return {fieldFilter:{field:{fieldPath:field},op:'LESS_THAN',value:{integerValue:String(Math.floor(ms))}}}; }
+function and(...f){ const x=f.filter(Boolean); return x.length===1?x[0]:{compositeFilter:{op:'AND',filters:x}}; }
+async function post(path,body){
+  const r=await fetch(BASE+path+'?key='+KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error('Firestore '+r.status+' '+m); }
+  return r.json();
+}
+async function aggregate(where,aggs){
+  const sq={from:[{collectionId:'scores'}]}; if(where) sq.where=where;
+  const res=await post(':runAggregationQuery',{structuredAggregationQuery:{structuredQuery:sq,aggregations:aggs}});
+  const f=(res[0]&&res[0].result&&res[0].result.aggregateFields)||{};
+  const out={}; for(const k in f){ const v=f[k]; out[k]=v.integerValue!==undefined?Number(v.integerValue):(v.doubleValue!==undefined?Number(v.doubleValue):null); }
+  return out;
+}
+const count=async where=>(await aggregate(where,[{alias:'n',count:{}}])).n||0;
+async function query(sq){
+  const res=await post(':runQuery',{structuredQuery:Object.assign({from:[{collectionId:'scores'}]},sq)});
+  return res.filter(x=>x.document).map(x=>{ const f=x.document.fields||{}; const g=k=>f[k]?(f[k].stringValue!==undefined?f[k].stringValue:Number(f[k].integerValue!==undefined?f[k].integerValue:f[k].doubleValue)):null; return {name:g('name'),iq:g('iq'),score:g('score'),earnedLevel:g('earnedLevel'),t:g('t')}; });
+}
+function fmtTime(ts){ if(!ts) return '-'; return new Date(ts).toLocaleString('tr-TR',{hour:'2-digit',minute:'2-digit'}); }
+function bars(el,rows){ const mx=Math.max(1,...rows.map(r=>r.count)); el.innerHTML=rows.map(c=>'<div class="bar-row"><div class="bar-label">'+escHtml(c.label)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(c.count/mx*100).toFixed(1)+'%"></div></div><div class="bar-count">'+c.count+'</div></div>').join(''); }
+function playerRows(list,tbodyId,emptyId){
+  const tb=$(tbodyId);
+  if(!list.length){ $(emptyId).style.display='block'; tb.innerHTML=''; return; }
+  $(emptyId).style.display='none';
+  tb.innerHTML=list.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+fmtTime(e.t)+'</td><td>'+escHtml(e.score??'-')+'</td><td>'+escHtml(e.iq??'-')+'</td></tr>').join('');
+}
+async function collect(){
+  const now=Date.now(), DAY=86400000;
+  const ts=new Date(); ts.setHours(0,0,0,0); const tMs=ts.getTime(), yMs=tMs-DAY;
+  const [tot,a1,a7,a30,avg,today,yest,top]=await Promise.all([
+    count(null), count(gte('t',now-DAY)), count(gte('t',now-7*DAY)), count(gte('t',now-30*DAY)),
+    aggregate(null,[{alias:'iq',avg:{field:{fieldPath:'iq'}}},{alias:'sc',avg:{field:{fieldPath:'score'}}}]),
+    query({where:gte('t',tMs),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),
+    query({where:and(gte('t',yMs),lt('t',tMs)),orderBy:[{field:{fieldPath:'t'},direction:'DESCENDING'}],limit:150}),
+    query({orderBy:[{field:{fieldPath:'score'},direction:'DESCENDING'}],limit:15})
+  ]);
+  const edges=[0,1,2,4,8,15,31]; const labels=['Bugün','Dün','2-3 gün','4-7 gün','8-14 gün','15-30 gün','30+ gün'];
+  const cum=await Promise.all(edges.map(d=>count(gte('t',now-d*DAY)))); // d günden yeni olanlar (kümülatif)
+  // cum[k] = son edges[k] gün içinde olmayanlar HARİÇ değil; bu yüzden: eskiler = tot - cum
+  const bucket=[]; 
+  // aktif ≤ d gün: count(t >= now-d*DAY). edges[0]=0 → t>=now → 0 kişi (gelecek); bölmeler için ardışık fark:
+  const within=[0,cum[1],cum[2],cum[3],cum[4],cum[5],cum[6]]; // 0 gün: yok; 1,2,4,8,15,31 gün içinde
+  const rows=[ {label:labels[0],count:within[1]}, {label:labels[1],count:within[2]-within[1]}, {label:labels[2],count:within[3]-within[2]},
+    {label:labels[3],count:within[4]-within[3]}, {label:labels[4],count:within[5]-within[4]}, {label:labels[5],count:within[6]-within[5]}, {label:labels[6],count:tot-within[6]} ];
+  return {at:now,tot,a1,a7,a30,iq:avg.iq,sc:avg.sc,today,yest,top,rows};
+}
+function render(d){
+  $('totalUsers').textContent=d.tot; $('active1d').textContent=d.a1; $('active7d').textContent=d.a7; $('active30d').textContent=d.a30;
+  $('avgIq').textContent=d.iq==null?'-':d.iq.toFixed(1); $('avgScore').textContent=d.sc==null?'-':Math.round(d.sc);
+  playerRows(d.today,'todayTable','todayEmpty'); playerRows(d.yest,'yesterdayTable','yesterdayEmpty');
+  bars($('activityBars'),d.rows);
+  $('topTable').innerHTML=d.top.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+escHtml(e.name)+'</td><td>'+escHtml(e.earnedLevel??'-')+'</td><td>'+escHtml(e.iq??'-')+'</td><td>'+escHtml(e.score??'-')+'</td></tr>').join('');
+  $('stamp').textContent='Hesaplanma: '+new Date(d.at).toLocaleString('tr-TR')+' (5 dakika önbellek)';
+  statusEl.style.display='none'; $('report').style.display='block';
+}
 async function run(){
   try{
-    const prefix='score:';
-    const snap = await db.collection('shared_kv')
-      .where(firebase.firestore.FieldPath.documentId(), '>=', prefix)
-      .where(firebase.firestore.FieldPath.documentId(), '<', prefix+'\uf8ff')
-      .get();
-
-    const entries=[];
-    snap.forEach(doc=>{
-      try{
-        const raw = doc.data().value;
-        if(!raw) return;
-        const d = JSON.parse(raw);
-        if(d && d.name) entries.push(d);
-      }catch(e){}
-    });
-
-    if(!entries.length){
-      statusEl.innerHTML = '<span class="err">Hiç kayıt bulunamadı (koleksiyon boş ya da erişim engellendi).</span>';
-      return;
-    }
-
-    const now = Date.now();
-    const DAY = 86400000;
-
-    // Takvim günü sınırları (cihazın yerel saatine göre 00:00-00:00)
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const yesterdayStart = new Date(todayStart.getTime() - DAY);
-    const todayStartMs = todayStart.getTime();
-    const yesterdayStartMs = yesterdayStart.getTime();
-
-    const todayPlayers = entries.filter(e => (e.t||0) >= todayStartMs).sort((a,b)=>(b.t||0)-(a.t||0));
-    const yesterdayPlayers = entries.filter(e => (e.t||0) >= yesterdayStartMs && (e.t||0) < todayStartMs).sort((a,b)=>(b.t||0)-(a.t||0));
-
-    function fmtTime(ts){
-      if(!ts) return '-';
-      const d = new Date(ts);
-      return d.toLocaleString('tr-TR', {hour:'2-digit', minute:'2-digit'});
-    }
-    function renderPlayerRows(list, tbodyId, emptyId){
-      const tbody = document.getElementById(tbodyId);
-      if(!list.length){
-        document.getElementById(emptyId).style.display = 'block';
-        tbody.innerHTML = '';
-        return;
-      }
-      tbody.innerHTML = list.map((e,i) => `
-        <tr>
-          <td>${i+1}</td>
-          <td>${escHtml(e.name)}</td>
-          <td>${fmtTime(e.t)}</td>
-          <td>${e.score!=null ? e.score : '-'}</td>
-          <td>${e.iq!=null ? e.iq : '-'}</td>
-        </tr>
-      `).join('');
-    }
-    renderPlayerRows(todayPlayers, 'todayTable', 'todayEmpty');
-    renderPlayerRows(yesterdayPlayers, 'yesterdayTable', 'yesterdayEmpty');
-
-    const active1d = entries.filter(e => (now - (e.t||0)) < 1*DAY).length;
-    const active7d = entries.filter(e => (now - (e.t||0)) < 7*DAY).length;
-    const active30d = entries.filter(e => (now - (e.t||0)) < 30*DAY).length;
-
-    const avgIq = entries.reduce((s,e)=>s+(Number(e.iq)||0),0) / entries.length;
-    const avgScore = entries.reduce((s,e)=>s+(Number(e.score)||0),0) / entries.length;
-
-    document.getElementById('totalUsers').textContent = entries.length;
-    document.getElementById('active1d').textContent = active1d;
-    document.getElementById('active7d').textContent = active7d;
-    document.getElementById('active30d').textContent = active30d;
-    document.getElementById('avgIq').textContent = avgIq.toFixed(1);
-    document.getElementById('avgScore').textContent = Math.round(avgScore);
-
-    // Aktivite dağılımı: bugün / dün / 2-3 gün / 4-7 gün / 8-14 gün / 15-30 gün / 30+ gün
-    const buckets = [
-      {label:'Bugün', test:d=>d<1},
-      {label:'Dün', test:d=>d>=1&&d<2},
-      {label:'2-3 gün', test:d=>d>=2&&d<4},
-      {label:'4-7 gün', test:d=>d>=4&&d<8},
-      {label:'8-14 gün', test:d=>d>=8&&d<15},
-      {label:'15-30 gün', test:d=>d>=15&&d<31},
-      {label:'30+ gün', test:d=>d>=31},
-    ];
-    const counts = buckets.map(b=>({
-      label:b.label,
-      count: entries.filter(e=>b.test((now-(e.t||0))/DAY)).length
-    }));
-    const maxCount = Math.max(1, ...counts.map(c=>c.count));
-    const barsEl = document.getElementById('activityBars');
-    barsEl.innerHTML = counts.map(c => `
-      <div class="bar-row">
-        <div class="bar-label">${c.label}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(c.count/maxCount*100).toFixed(1)}%"></div></div>
-        <div class="bar-count">${c.count}</div>
-      </div>
-    `).join('');
-
-    // En yüksek puanlı 15
-    const top15 = [...entries].sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,15);
-    document.getElementById('topTable').innerHTML = top15.map((e,i)=>`
-      <tr>
-        <td>${i+1}</td>
-        <td>${escHtml(e.name)}</td>
-        <td>${e.earnedLevel!=null ? e.earnedLevel : '-'}</td>
-        <td>${e.iq!=null ? e.iq : '-'}</td>
-        <td>${e.score!=null ? e.score : '-'}</td>
-      </tr>
-    `).join('');
-
-    statusEl.style.display='none';
-    document.getElementById('report').style.display='block';
-  }catch(err){
-    statusEl.innerHTML = '<span class="err">Hata: '+escHtml(String(err.message||err))+'</span>';
-  }
+    let cached=null; try{ cached=JSON.parse(sessionStorage.getItem('mg_stats_v1')||'null'); }catch(e){}
+    if(cached&&Date.now()-cached.at<300000){ render(cached); return; }
+    const d=await collect();
+    try{ sessionStorage.setItem('mg_stats_v1',JSON.stringify(d)); }catch(e){}
+    render(d);
+  }catch(err){ statusEl.innerHTML='<span class="err">Hata: '+escHtml(String(err.message||err))+'</span>'; }
 }
-
-function escHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
 // ── Şifre kapısı ────────────────────────────────────────────────
 // Bu bir caydırıcıdır: sayfayı rastgele açanı engeller. Veri zaten oyunun kendi
 // bağlantısıyla okunabilir; asıl koruma Firestore kurallarındadır.
