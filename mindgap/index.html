@@ -2888,6 +2888,9 @@ async function askUsername(forced){
 
 // ── Liderlik tablosu ──
 async function fetchLeaderboardEntries(){
+  // GEÇİCİ BAKIM (22 Ekim 2026): tüm skorları çekmek Firestore günlük okuma kotasını bitiriyor.
+  // Yeni, hafif sıralama sistemi hazır olana kadar tam çekim kapalı. Skor KAYDI etkilenmez.
+  throw new Error('lb-paused');
   // ÖNEMLİ: önceki sürüm önce tüm 'score:*' doküman ID'lerini çekiyor, SONRA
   // her birini TEK TEK ve SIRAYLA (await ile) yeniden çekiyordu — 116 oyuncu
   // varsa 116 ayrı ağ gidiş-dönüşü, art arda! Bu, "2-3 dakika" bekleme
@@ -2926,7 +2929,7 @@ async function showLeaderboard(){
   try{
     entries=await fetchLeaderboardEntries();
   }catch(e){
-    list.innerHTML=`<p style="text-align:center;color:#ff8a4a">📡 ${T('offlineMode')}</p>`;
+    list.innerHTML=`<p style="text-align:center;color:#ff8a4a">🛠️ ${T('rankUnavailable')}</p>`;
     return;
   }
 
