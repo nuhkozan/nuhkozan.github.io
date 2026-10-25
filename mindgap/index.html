@@ -354,6 +354,43 @@ button:disabled{opacity:.35;cursor:default}
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics-compat.js"></script>
 <script>
+// ═══ UYGULAMA KAPISI ═══
+// Oyun yalnızca Android uygulamasında (AndroidBridge var) veya eski TWA sürümünde
+// (referrer android-app://com.mindgap.app) çalışır. Tarayıcıdan gelenler Play Store'a
+// yönlendirilir. Test için: ...index.html?test=1 (yalnızca o oturum için tarayıcıda açar).
+(function(){
+  var inApp=!!window.AndroidBridge, test=false;
+  try{
+    if(/[?&]test=1(&|$)/.test(location.search)) sessionStorage.setItem('mg_test','1');
+    test = sessionStorage.getItem('mg_test')==='1';
+    if((document.referrer||'').indexOf('android-app://com.mindgap.app')===0) sessionStorage.setItem('mg_twa','1');
+    if(!inApp && sessionStorage.getItem('mg_twa')==='1') inApp=true;
+  }catch(e){}
+  window.MG_TEST_MODE = test && !window.AndroidBridge;
+  window.MG_BLOCKED = !(inApp || test);
+  window.mgShowWebBlock=function(){
+    var T={
+      en:['Play MIND GAP in the app','This game now runs only in the Android app. Download it free from Google Play.','Get it on Google Play'],
+      tr:['MIND GAP\'i uygulamada oyna','Bu oyun artık yalnızca Android uygulamasında çalışıyor. Google Play\'den ücretsiz indir.','Google Play\'den indir'],
+      es:['Juega MIND GAP en la app','Este juego ahora solo funciona en la app de Android. Descárgala gratis en Google Play.','Descargar en Google Play'],
+      ar:['العب MIND GAP في التطبيق','تعمل هذه اللعبة الآن في تطبيق أندرويد فقط. حمّلها مجانًا من Google Play.','حمّل من Google Play'],
+      ru:['Играй в MIND GAP в приложении','Теперь игра работает только в приложении для Android. Скачай бесплатно в Google Play.','Скачать в Google Play']
+    };
+    var l=((navigator.language||'en').slice(0,2)).toLowerCase(); var t=T[l]||T.en;
+    var d=document.createElement('div');
+    d.setAttribute('style','position:fixed;inset:0;z-index:2147483647;background:#060A10;color:#e8f0ff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;font-family:system-ui,sans-serif');
+    if(l==='ar') d.setAttribute('dir','rtl');
+    var h=document.createElement('div');h.style.cssText='font-size:2.4em';h.textContent='🧠';
+    var a=document.createElement('div');a.style.cssText='font-size:1.4em;font-weight:700';a.textContent=t[0];
+    var b=document.createElement('div');b.style.cssText='max-width:340px;line-height:1.5;color:#9fb0c8';b.textContent=t[1];
+    var c=document.createElement('a');c.href='https://play.google.com/store/apps/details?id=com.mindgap.app';
+    c.style.cssText='background:#2ecc71;color:#06210f;font-weight:700;padding:14px 26px;border-radius:12px;text-decoration:none';c.textContent=t[2];
+    d.appendChild(h);d.appendChild(a);d.appendChild(b);d.appendChild(c);
+    document.body.innerHTML='';document.body.appendChild(d);
+  };
+})();
+</script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyBMcuXyZBDCuZ8ZiqKsheh41LqUyWDU5b8",
   authDomain: "mindgap-c51b7.firebaseapp.com",
@@ -541,6 +578,7 @@ function logAnalyticsEvent(name, params){
 
 <script>
 'use strict';
+if(window.MG_BLOCKED){ window.mgShowWebBlock(); throw new Error('mg-web-blocked'); }
 
 // ═══════════════════════════════════════════════════════
 // SES MOTORU — dosyasız, Web Audio API ile üretilen kısa efektler
@@ -1394,7 +1432,7 @@ async function checkWin(){
   const titleChanged=countsForProgress && newTitle!==oldTitle;
   // grantBonusHintIfDue() tamamen yerel/senkron (ağ gerektirmez) — anında çağrılabilir.
   const gotBonus=countsForProgress && grantBonusHintIfDue();
-  // ÜNVAN ATLAMA ÖDÜLÜ: +50 bonus puan + 1 kalıcı ekstra ipucu hakkı (sadece reklamsız ilk çözümde)
+  // ÜNVAN ATLAMA ÖDÜLÜ: +50 bonus puan + 1 kalıcı ekstra ipucu hakkı (her bölümün ilk çözümünde)
   const titleBonusScore=titleChanged?50:0;
   if(titleChanged){
     BONUS_HINTS++;
@@ -2021,7 +2059,8 @@ document.getElementById('solveBtn').onclick=()=>{
     return;
   }
 
-  // Native köprü yok (tarayıcı/PWA testi) — sahte reklam simülasyonu.
+  // Native köprü yok. Sahte reklam YALNIZCA test modunda (?test=1); eski TWA sürümünde ipucu verilmez.
+  if(!window.MG_TEST_MODE){ showToast(T('adNeedApp'),3500); return; }
   const ad=ADS[Math.floor(Math.random()*ADS.length)];
   document.getElementById('adEmoji').textContent=ad.emoji;
   document.getElementById('adTitle').textContent=ad.title;
@@ -2731,7 +2770,9 @@ function escHtml(s){
   }[c]));
 }
 function normName(n){return n.trim().replace(/\s+/g,' ');}
-function nameKey(n){return n.toLocaleLowerCase('tr').replace(/[^a-z0-9çğıöşü]/g,'_');}
+// Eski anahtarlarla UYUMLU: yalnızca Latin/Türkçe harf-rakam içeren eski adlar aynı anahtarı üretir.
+// Kiril ve Arapça harfler de artık kendi anahtarını üretir (eskiden hepsi '_' oluyordu).
+function nameKey(n){return n.normalize('NFC').toLocaleLowerCase('tr').replace(/[^\p{L}\p{M}\p{N}]/gu,'_');}
 
 // Yeni kullanıcı oluşturulduğunda önceki oyuncunun tüm yerel ilerlemesini sıfırla
 function resetLocalPlayerState(alsoResetDemoFlag){
@@ -2854,7 +2895,7 @@ async function askUsername(forced){
       if(name.length>16){err.textContent=T('nameTooLong');return;}
       // Sadece harf/rakam/boşluk — görünmez/kontrol karakterleri ve emoji ile
       // kimlik taklidini (impersonation) engeller.
-      if(!/^[A-Za-zÇĞİIıÖŞÜçğıöşü0-9 ]+$/.test(name)){err.textContent=T('nameInvalidChars');return;}
+      if(!/^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Arabic}\p{Nd} ]+$/u.test(name)){err.textContent=T('nameInvalidChars');return;}
       okBtn.disabled=true;
       okBtn.textContent=T('checkingBtn');
       const res=await registerUser(name);
@@ -2984,7 +3025,7 @@ async function showLeaderboard(){
     const earnedLvl=(typeof d.earnedLevel==='number')?d.earnedLevel:(Number(d.level)||0);
     const titleTxt=titleFor(earnedLvl);
     row.innerHTML=`<span class="rank">${medal}</span>
-      <span class="name">${escHtml(d.name)}<br><span class="title">${escHtml(titleTxt)} • 🧠 IQ ${Number(d.iq)||85} • 🎯 ${T('lvl')} ${earnedLvl+1}</span></span>
+      <span class="name"><bdi>${escHtml(d.name)}</bdi><br><span class="title">${escHtml(titleTxt)} • 🧠 IQ ${Number(d.iq)||85} • 🎯 ${T('lvl')} ${earnedLvl+1}</span></span>
       <span class="score">⭐ ${Number(d.score)||0}</span>`;
     return row;
   }
@@ -3234,10 +3275,10 @@ const I18N={
     hint:'💡 Hint', reset:'↺ Reset', ad:'📺 Watch Ad & Get Hint', prevLevel:'Prev', nextLevel:'Next',
     win:'🎉 Level Complete!', next:'Next Level →', newTitle:'New Title',
     hintOver:'💡 No hints left — watch an ad for more', hintUsedT:'💡 Hint',
-    adWait:'Ad:', adDone:'Ad finished!', adClose:'✕ Close Ad & Get Hint', adLoading:'Loading ad...', adFailed:'Ad failed to show, try again', adNotReady:'Ad not ready yet, try again shortly', adTimeoutFallback:'No ad available right now — try again in a moment', adHintEarned:'💡 +1 hint earned!', adClosedNoReward:'Ad closed early — no hint earned',
+    adWait:'Ad:', adDone:'Ad finished!', adClose:'✕ Close Ad & Get Hint', adLoading:'Loading ad...', adFailed:'Ad failed to show, try again', adNotReady:'Ad not ready yet, try again shortly', adTimeoutFallback:'No ad available right now — try again in a moment', adNeedApp:'Ads work only in the latest app — please update from Google Play', adHintEarned:'💡 +1 hint earned!', adClosedNoReward:'Ad closed early — no hint earned',
     allDone:'🏆 You finished all 255 levels!', empty:'cells empty — only the target must stay empty',
     lbTitle:'🏆 Champions League', lbEmpty:'Nobody yet — be the first!', close:'✕ Close', rankUp:'ranks up', rankDown:'ranks down', rankSame:'no change', rankUnavailable:'Ranking unavailable', rankLoading:'🏆 Updating ranking...', rankEntered:'entered the ranking', newTitleLabel:'New Title Unlocked!', currentTitleLabel:'Your Title', offlineRequired:'Internet connection required to create a username', nameTaken:'This username is already taken!', nameTooShort:'Must be at least 3 characters', nameTooLong:'Max 16 characters', nameInvalidChars:'Only letters, numbers and spaces allowed', setUsernameTitle:'👤 Set Username', namePlaceholder:'e.g: BrainKing42', startBtn:'Start ▶', checkingBtn:'Checking...', retryBtn:'⟳ Retry', offlineMode:'Offline — score, IQ & ranking disabled', backBtn:'◀ Back', lbYourRank:'You are #{rank} of {total} players',
-    score:'Score', bonusHint:'Bonus hint earned!', newUser:'New Username', newGame:'New Game', continueGame:'Continue', welcomeBack:'Welcome back', alreadySolved:'Already solved — no points', adSolvedNoReward:'Solved via ad — no points or IQ', demoTitle:'Tutorial', demoSub:'Watch how the game works', skipTutorial:'Skip Tutorial', demoWelcome:'👋 Welcome! Let\'s see how it works...', demoDrag:'👆 Hold & drag the piece onto the board', demoComplete:'✅ That\'s it! Now try it yourself',
+    score:'Score', bonusHint:'Bonus hint earned!', newUser:'New Username', newGame:'New Game', continueGame:'Continue', welcomeBack:'Welcome back', alreadySolved:'Already solved — no points', demoTitle:'Tutorial', demoSub:'Watch how the game works', skipTutorial:'Skip Tutorial', demoWelcome:'👋 Welcome! Let\'s see how it works...', demoDrag:'👆 Hold & drag the piece onto the board', demoComplete:'✅ That\'s it! Now try it yourself',
     tutInteractiveSub:'Now it\'s your turn — try it yourself', tutRotateMsg:'👆 Tap the piece to rotate it', tutDragMsg:'✋ Now drag it onto the board', tutDoneMsg:'🎉 Perfect! You\'ve got it',
     level1GuideHint:'👆 Tap "Hint" to place your first piece', level1GuideRotate:'👆 Tap the piece to rotate it into place', level1GuideDrag:'✋ Now drag this piece onto the marked spot',
     shareBtnLabel:'📤 Share', shareText:'I just reached {title} (IQ {iq}, Level {level}) in Mind Gap! 🧠 Can you beat me?', shareCopied:'Copied! You can paste it anywhere.',
@@ -3256,10 +3297,10 @@ const I18N={
     hint:'💡 İpucu', reset:'↺ Sıfırla', ad:'📺 Reklam izle & İpucu kazan', prevLevel:'Önceki', nextLevel:'Sonraki',
     win:'🎉 Bölüm Tamamlandı!', next:'Sonraki Bölüm →', newTitle:'Yeni Ünvan',
     hintOver:'💡 İpucu hakkın bitti — reklam izleyip kazan', hintUsedT:'💡 İpucu',
-    adWait:'Reklam:', adDone:'Reklam bitti!', adClose:'✕ Reklamı Kapat ve İpucu Al', adLoading:'Reklam yükleniyor...', adFailed:'Reklam gösterilemedi, tekrar dene', adNotReady:'Reklam henüz hazır değil, birazdan tekrar dene', adTimeoutFallback:'Şu an reklam yok — biraz sonra tekrar dene', adHintEarned:'💡 +1 ipucu kazandın!', adClosedNoReward:'Reklam yarıda kapandı — ipucu verilmedi',
+    adWait:'Reklam:', adDone:'Reklam bitti!', adClose:'✕ Reklamı Kapat ve İpucu Al', adLoading:'Reklam yükleniyor...', adFailed:'Reklam gösterilemedi, tekrar dene', adNotReady:'Reklam henüz hazır değil, birazdan tekrar dene', adTimeoutFallback:'Şu an reklam yok — biraz sonra tekrar dene', adNeedApp:'Reklamlar yalnızca güncel uygulamada çalışır — Google Play\'den güncelle', adHintEarned:'💡 +1 ipucu kazandın!', adClosedNoReward:'Reklam yarıda kapandı — ipucu verilmedi',
     allDone:'🏆 Tüm 255 bölümü bitirdin!', empty:'kare boş kaldı — sadece hedef kare boş olmalı',
     lbTitle:'🏆 Şampiyonlar Ligi', lbEmpty:'Henüz kimse yok — ilk sen ol!', close:'✕ Kapat', rankUp:'sıra yükseldi', rankDown:'sıra düştü', rankSame:'değişim yok', rankUnavailable:'Sıralama alınamadı', rankLoading:'🏆 Sıralama güncelleniyor...', rankEntered:'sıralamaya girdi', newTitleLabel:'Yeni Ünvan Kazandın!', currentTitleLabel:'Ünvanın', offlineRequired:'Kullanıcı adı oluşturmak için internet bağlantısı gerekli', nameTaken:'Bu kullanıcı adı zaten alınmış!', nameTooShort:'En az 3 karakter olmalı', nameTooLong:'En fazla 16 karakter', nameInvalidChars:'Sadece harf, rakam ve boşluk kullanılabilir', setUsernameTitle:'👤 Kullanıcı Adı Belirle', namePlaceholder:'ör: ZekaKralı42', startBtn:'Başla ▶', checkingBtn:'Kontrol ediliyor...', retryBtn:'⟳ Tekrar Dene', offlineMode:'Çevrimdışı — puan, IQ ve sıralama devre dışı', backBtn:'◀ Geri', lbYourRank:'{total} oyuncu içinde {rank}.\'sisiniz',
-    score:'Puan', bonusHint:'Bonus ipucu kazandın!', newUser:'Yeni Kullanıcı Adı', newGame:'Yeni Oyun', continueGame:'Devam Et', welcomeBack:'Tekrar hoş geldin', alreadySolved:'Zaten çözülmüş — puan yok', adSolvedNoReward:'Reklamla çözüldü — puan/IQ yok', demoTitle:'Tanıtım', demoSub:'Oyunun nasıl oynandığını izle', skipTutorial:'Tanıtımı Geç', demoWelcome:'👋 Hoş geldin! Nasıl oynandığına bakalım...', demoDrag:'👆 Parçayı basılı tutup tahtaya sürükle', demoComplete:'✅ İşte bu kadar! Şimdi sıra sende',
+    score:'Puan', bonusHint:'Bonus ipucu kazandın!', newUser:'Yeni Kullanıcı Adı', newGame:'Yeni Oyun', continueGame:'Devam Et', welcomeBack:'Tekrar hoş geldin', alreadySolved:'Zaten çözülmüş — puan yok', demoTitle:'Tanıtım', demoSub:'Oyunun nasıl oynandığını izle', skipTutorial:'Tanıtımı Geç', demoWelcome:'👋 Hoş geldin! Nasıl oynandığına bakalım...', demoDrag:'👆 Parçayı basılı tutup tahtaya sürükle', demoComplete:'✅ İşte bu kadar! Şimdi sıra sende',
     tutInteractiveSub:'Şimdi sıra sende — kendin dene', tutRotateMsg:'👆 Parçaya dokun ve döndür', tutDragMsg:'✋ Şimdi sürükleyip tahtaya yerleştir', tutDoneMsg:'🎉 Harika! Öğrendin',
     level1GuideHint:'👆 İlk parçayı yerleştirmek için "İpucu"na dokun', level1GuideRotate:'👆 Parçaya dokun, doğru yöne döndür', level1GuideDrag:'✋ Şimdi bu parçayı işaretli yere sürükle',
     shareBtnLabel:'📤 Paylaş', shareText:'Mind Gap\'te az önce {title} ünvanına ulaştım! (IQ {iq}, Bölüm {level}) 🧠 Beni geçebilir misin?', shareCopied:'Kopyalandı! İstediğin yere yapıştırabilirsin.',
@@ -3278,10 +3319,10 @@ const I18N={
     hint:'💡 Pista', reset:'↺ Reiniciar', ad:'📺 Ver Anuncio y Ganar Pista', prevLevel:'Ant.', nextLevel:'Sig.',
     win:'🎉 ¡Nivel Completado!', next:'Siguiente Nivel →', newTitle:'Nuevo Título',
     hintOver:'💡 Sin pistas — mira un anuncio para ganar más', hintUsedT:'💡 Pista',
-    adWait:'Anuncio:', adDone:'¡Anuncio terminado!', adClose:'✕ Cerrar y Ganar Pista', adLoading:'Cargando anuncio...', adFailed:'Error al mostrar el anuncio, intenta de nuevo', adNotReady:'El anuncio aún no está listo, intenta en breve', adTimeoutFallback:'No hay anuncio disponible ahora — inténtalo en un momento', adHintEarned:'💡 ¡+1 pista ganada!', adClosedNoReward:'Anuncio cerrado antes de tiempo — sin pista',
+    adWait:'Anuncio:', adDone:'¡Anuncio terminado!', adClose:'✕ Cerrar y Ganar Pista', adLoading:'Cargando anuncio...', adFailed:'Error al mostrar el anuncio, intenta de nuevo', adNotReady:'El anuncio aún no está listo, intenta en breve', adTimeoutFallback:'No hay anuncio disponible ahora — inténtalo en un momento', adNeedApp:'Los anuncios solo funcionan en la última versión — actualiza desde Google Play', adHintEarned:'💡 ¡+1 pista ganada!', adClosedNoReward:'Anuncio cerrado antes de tiempo — sin pista',
     allDone:'🏆 ¡Completaste los 255 niveles!', empty:'casillas vacías — solo el objetivo debe quedar vacío',
     lbTitle:'🏆 Liga de Campeones', lbEmpty:'Nadie aún — ¡sé el primero!', close:'✕ Cerrar', rankUp:'subió de puesto', rankDown:'bajó de puesto', rankSame:'sin cambio', rankUnavailable:'Ranking no disponible', rankLoading:'🏆 Actualizando ranking...', rankEntered:'entró al ranking', newTitleLabel:'¡Nuevo Título Desbloqueado!', currentTitleLabel:'Tu Título', offlineRequired:'Se requiere conexión a internet para crear un nombre de usuario', nameTaken:'¡Este nombre de usuario ya está en uso!', nameTooShort:'Debe tener al menos 3 caracteres', nameTooLong:'Máximo 16 caracteres', nameInvalidChars:'Solo letras, números y espacios', setUsernameTitle:'👤 Elegir Nombre de Usuario', namePlaceholder:'ej: ReyMental42', startBtn:'Comenzar ▶', checkingBtn:'Verificando...', retryBtn:'⟳ Reintentar', offlineMode:'Sin conexión — puntos, IQ y ranking desactivados', backBtn:'◀ Atrás', lbYourRank:'Eres el #{rank} de {total} jugadores',
-    score:'Puntos', bonusHint:'¡Pista extra ganada!', newUser:'Nuevo Usuario', newGame:'Nuevo Juego', continueGame:'Continuar', welcomeBack:'Bienvenido de nuevo', alreadySolved:'Ya resuelto — sin puntos', adSolvedNoReward:'Resuelto con anuncio — sin puntos ni IQ', demoTitle:'Tutorial', demoSub:'Mira cómo funciona el juego', skipTutorial:'Omitir Tutorial', demoWelcome:'👋 ¡Bienvenido! Veamos cómo funciona...', demoDrag:'👆 Mantén y arrastra la pieza al tablero', demoComplete:'✅ ¡Eso es todo! Ahora inténtalo tú',
+    score:'Puntos', bonusHint:'¡Pista extra ganada!', newUser:'Nuevo Usuario', newGame:'Nuevo Juego', continueGame:'Continuar', welcomeBack:'Bienvenido de nuevo', alreadySolved:'Ya resuelto — sin puntos', demoTitle:'Tutorial', demoSub:'Mira cómo funciona el juego', skipTutorial:'Omitir Tutorial', demoWelcome:'👋 ¡Bienvenido! Veamos cómo funciona...', demoDrag:'👆 Mantén y arrastra la pieza al tablero', demoComplete:'✅ ¡Eso es todo! Ahora inténtalo tú',
     tutInteractiveSub:'Ahora te toca a ti — inténtalo', tutRotateMsg:'👆 Toca la pieza para girarla', tutDragMsg:'✋ Ahora arrástrala al tablero', tutDoneMsg:'🎉 ¡Perfecto! Ya lo tienes',
     level1GuideHint:'👆 Toca "Pista" para colocar tu primera pieza', level1GuideRotate:'👆 Toca la pieza para girarla a su posición', level1GuideDrag:'✋ Ahora arrastra esta pieza al lugar marcado',
     shareBtnLabel:'📤 Compartir', shareText:'¡Acabo de alcanzar {title} (IQ {iq}, Nivel {level}) en Mind Gap! 🧠 ¿Puedes superarme?', shareCopied:'¡Copiado! Puedes pegarlo donde quieras.',
@@ -3300,10 +3341,10 @@ const I18N={
     hint:'💡 تلميح', reset:'↺ إعادة', ad:'📺 شاهد إعلانًا واحصل على تلميح', prevLevel:'السابق', nextLevel:'التالي',
     win:'🎉 اكتملت المرحلة!', next:'المرحلة التالية ←', newTitle:'لقب جديد',
     hintOver:'💡 انتهت التلميحات — شاهد إعلانًا للحصول على المزيد', hintUsedT:'💡 تلميح',
-    adWait:'إعلان:', adDone:'انتهى الإعلان!', adClose:'✕ أغلق واحصل على تلميح', adLoading:'جارٍ تحميل الإعلان...', adFailed:'تعذر عرض الإعلان، حاول مرة أخرى', adNotReady:'الإعلان غير جاهز بعد، حاول بعد قليل', adTimeoutFallback:'لا يوجد إعلان متاح الآن — حاول بعد قليل', adHintEarned:'💡 حصلت على +1 تلميح!', adClosedNoReward:'أُغلق الإعلان مبكرًا — لم تحصل على تلميح',
+    adWait:'إعلان:', adDone:'انتهى الإعلان!', adClose:'✕ أغلق واحصل على تلميح', adLoading:'جارٍ تحميل الإعلان...', adFailed:'تعذر عرض الإعلان، حاول مرة أخرى', adNotReady:'الإعلان غير جاهز بعد، حاول بعد قليل', adTimeoutFallback:'لا يوجد إعلان متاح الآن — حاول بعد قليل', adNeedApp:'الإعلانات تعمل فقط في أحدث إصدار — حدّث من Google Play', adHintEarned:'💡 حصلت على +1 تلميح!', adClosedNoReward:'أُغلق الإعلان مبكرًا — لم تحصل على تلميح',
     allDone:'🏆 أنهيت كل الـ255 مرحلة!', empty:'خانات فارغة — فقط الهدف يجب أن يبقى فارغاً',
     lbTitle:'🏆 دوري الأبطال', lbEmpty:'لا أحد بعد — كن الأول!', close:'✕ إغلاق', rankUp:'ترقية بالترتيب', rankDown:'تراجع بالترتيب', rankSame:'بدون تغيير', rankUnavailable:'الترتيب غير متاح', rankLoading:'🏆 يتم تحديث الترتيب...', rankEntered:'دخل الترتيب', newTitleLabel:'لقب جديد مفتوح!', currentTitleLabel:'لقبك', offlineRequired:'يلزم الاتصال بالإنترنت لإنشاء اسم مستخدم', nameTaken:'اسم المستخدم هذا مُستخدم بالفعل!', nameTooShort:'يجب ألا يقل عن 3 أحرف', nameTooLong:'الحد الأقصى 16 حرفاً', nameInvalidChars:'الأحرف والأرقام والمسافات فقط', setUsernameTitle:'👤 تعيين اسم المستخدم', namePlaceholder:'مثال: ملك٤٢', startBtn:'ابدأ ▶', checkingBtn:'جارٍ التحقق...', retryBtn:'⟳ أعد المحاولة', offlineMode:'غير متصل — النقاط والذكاء والترتيب معطلة', backBtn:'◀ رجوع', lbYourRank:'أنت #{rank} من أصل {total} لاعباً',
-    score:'النقاط', bonusHint:'حصلت على تلميح إضافي!', newUser:'اسم مستخدم جديد', newGame:'لعبة جديدة', continueGame:'متابعة', welcomeBack:'مرحباً بعودتك', alreadySolved:'تم حلها مسبقاً — بلا نقاط', adSolvedNoReward:'حُلّت عبر الإعلان — بلا نقاط أو ذكاء', demoTitle:'تعليمي', demoSub:'شاهد كيف تعمل اللعبة', skipTutorial:'تخطي الشرح', demoWelcome:'👋 مرحباً! لنرَ كيف تعمل...', demoDrag:'👆 اضغط مطولاً واسحب القطعة إلى اللوحة', demoComplete:'✅ هذا كل شيء! الآن جرّب بنفسك',
+    score:'النقاط', bonusHint:'حصلت على تلميح إضافي!', newUser:'اسم مستخدم جديد', newGame:'لعبة جديدة', continueGame:'متابعة', welcomeBack:'مرحباً بعودتك', alreadySolved:'تم حلها مسبقاً — بلا نقاط', demoTitle:'تعليمي', demoSub:'شاهد كيف تعمل اللعبة', skipTutorial:'تخطي الشرح', demoWelcome:'👋 مرحباً! لنرَ كيف تعمل...', demoDrag:'👆 اضغط مطولاً واسحب القطعة إلى اللوحة', demoComplete:'✅ هذا كل شيء! الآن جرّب بنفسك',
     tutInteractiveSub:'الآن دورك — جرّب بنفسك', tutRotateMsg:'👆 اضغط على القطعة لتدويرها', tutDragMsg:'✋ الآن اسحبها إلى اللوحة', tutDoneMsg:'🎉 ممتاز! لقد أتقنتها',
     level1GuideHint:'👆 اضغط على "تلميح" لوضع أول قطعة', level1GuideRotate:'👆 اضغط على القطعة لتدويرها إلى مكانها الصحيح', level1GuideDrag:'✋ الآن اسحب هذه القطعة إلى المكان المُحدد',
     shareBtnLabel:'📤 مشاركة', shareText:'وصلت للتو إلى لقب {title} (الذكاء {iq}، المرحلة {level}) في Mind Gap! 🧠 هل يمكنك التفوق عليّ؟', shareCopied:'تم النسخ! يمكنك لصقه في أي مكان.',
@@ -3322,10 +3363,10 @@ const I18N={
     hint:'💡 Подсказка', reset:'↺ Сброс', ad:'📺 Реклама и подсказка', prevLevel:'Пред.', nextLevel:'След.',
     win:'🎉 Уровень пройден!', next:'Следующий уровень →', newTitle:'Новый титул',
     hintOver:'💡 Подсказок нет — посмотри рекламу, чтобы получить ещё', hintUsedT:'💡 Подсказка',
-    adWait:'Реклама:', adDone:'Реклама окончена!', adClose:'✕ Закрыть и получить подсказку', adLoading:'Загрузка рекламы...', adFailed:'Не удалось показать рекламу, попробуйте снова', adNotReady:'Реклама ещё не готова, попробуйте через момент', adTimeoutFallback:'Сейчас нет рекламы — попробуй чуть позже', adHintEarned:'💡 +1 подсказка получена!', adClosedNoReward:'Реклама закрыта раньше времени — подсказка не начислена',
+    adWait:'Реклама:', adDone:'Реклама окончена!', adClose:'✕ Закрыть и получить подсказку', adLoading:'Загрузка рекламы...', adFailed:'Не удалось показать рекламу, попробуйте снова', adNotReady:'Реклама ещё не готова, попробуйте через момент', adTimeoutFallback:'Сейчас нет рекламы — попробуй чуть позже', adNeedApp:'Реклама работает только в последней версии — обнови из Google Play', adHintEarned:'💡 +1 подсказка получена!', adClosedNoReward:'Реклама закрыта раньше времени — подсказка не начислена',
     allDone:'🏆 Ты прошёл все 255 уровней!', empty:'клеток пусто — пустой должна быть только цель',
     lbTitle:'🏆 Лига Чемпионов', lbEmpty:'Пока никого — будь первым!', close:'✕ Закрыть', rankUp:'подъём в рейтинге', rankDown:'падение в рейтинге', rankSame:'без изменений', rankUnavailable:'Рейтинг недоступен', rankLoading:'🏆 Обновление рейтинга...', rankEntered:'попал в рейтинг', newTitleLabel:'Новое звание получено!', currentTitleLabel:'Твоё звание', offlineRequired:'Для создания имени пользователя нужен интернет', nameTaken:'Это имя уже занято!', nameTooShort:'Минимум 3 символа', nameTooLong:'Максимум 16 символов', nameInvalidChars:'Только буквы, цифры и пробелы', setUsernameTitle:'👤 Задать Имя Пользователя', namePlaceholder:'напр: КорольУма42', startBtn:'Начать ▶', checkingBtn:'Проверка...', retryBtn:'⟳ Повторить', offlineMode:'Офлайн — очки, IQ и рейтинг отключены', backBtn:'◀ Назад', lbYourRank:'Вы #{rank} из {total} игроков',
-    score:'Очки', bonusHint:'Получена бонусная подсказка!', newUser:'Новый ник', newGame:'Новая игра', continueGame:'Продолжить', welcomeBack:'С возвращением', alreadySolved:'Уже решено — без очков', adSolvedNoReward:'Решено через рекламу — без очков и IQ', demoTitle:'Обучение', demoSub:'Посмотри, как играть', skipTutorial:'Пропустить', demoWelcome:'👋 Добро пожаловать! Посмотрим как это работает...', demoDrag:'👆 Удерживай и тяни фигуру на доску', demoComplete:'✅ Вот и всё! Теперь попробуй сам',
+    score:'Очки', bonusHint:'Получена бонусная подсказка!', newUser:'Новый ник', newGame:'Новая игра', continueGame:'Продолжить', welcomeBack:'С возвращением', alreadySolved:'Уже решено — без очков', demoTitle:'Обучение', demoSub:'Посмотри, как играть', skipTutorial:'Пропустить', demoWelcome:'👋 Добро пожаловать! Посмотрим как это работает...', demoDrag:'👆 Удерживай и тяни фигуру на доску', demoComplete:'✅ Вот и всё! Теперь попробуй сам',
     tutInteractiveSub:'Теперь твоя очередь — попробуй сам', tutRotateMsg:'👆 Нажми на фигуру, чтобы повернуть', tutDragMsg:'✋ Теперь перетащи её на доску', tutDoneMsg:'🎉 Отлично! У тебя получилось',
     level1GuideHint:'👆 Нажми «Подсказка», чтобы разместить первую фигуру', level1GuideRotate:'👆 Нажми на фигуру, чтобы повернуть её в нужное положение', level1GuideDrag:'✋ Теперь перетащи эту фигуру на отмеченное место',
     shareBtnLabel:'📤 Поделиться', shareText:'Я только что достиг звания {title} (IQ {iq}, Уровень {level}) в Mind Gap! 🧠 Сможешь меня превзойти?', shareCopied:'Скопировано! Можешь вставить куда угодно.',
