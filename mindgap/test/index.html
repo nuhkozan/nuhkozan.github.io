@@ -1431,7 +1431,8 @@ async function checkWin(){
   const newTitle=titleFor(EARNED_LEVEL);
   const titleChanged=countsForProgress && newTitle!==oldTitle;
   // grantBonusHintIfDue() tamamen yerel/senkron (ağ gerektirmez) — anında çağrılabilir.
-  const gotBonus=countsForProgress && grantBonusHintIfDue();
+  // Kural: ipucu KULLANILMADAN çözülen her 3 bölümde +1 ekstra ipucu (ipuçlu bölümler sayılmaz, sayacı sıfırlamaz).
+  const gotBonus=countsForProgress && !HINTED_LEVELS.has(LEVEL) && grantBonusHintIfDue();
   // ÜNVAN ATLAMA ÖDÜLÜ: +50 bonus puan + 1 kalıcı ekstra ipucu hakkı (her bölümün ilk çözümünde)
   const titleBonusScore=titleChanged?50:0;
   if(titleChanged){
@@ -1841,7 +1842,7 @@ function updateScoreBadge(){
 
 function grantBonusHintIfDue(){
   levelsSinceBonus++;
-  if(levelsSinceBonus>=3){ // her 3 bölümde bir bonus ipucu
+  if(levelsSinceBonus>=3){ // ipucusuz çözülen her 3 bölümde bir bonus ipucu
     levelsSinceBonus=0;
     BONUS_HINTS++;
     localStorage_set('pz_bonushints',String(BONUS_HINTS));
@@ -1918,6 +1919,9 @@ function updateStreakUI(){
 document.getElementById('resetBtn').onclick=()=>{loadLevel();};
 
 let hintUsed=0; // bu bölümde kullanılan ipucu sayısı
+// Bu oturumda ipucu kullanılan bölümler — Sıfırla/Önceki-Sonraki ile sıfırlanmaz;
+// ipucusuz-çözüm bonusu için bu bölümler sayılmaz.
+const HINTED_LEVELS=new Set();
 
 document.getElementById('hintBtn').onclick=()=>{
   // Bölüm başına temel ipucu: 5×5→1, 6×6→2, 7×7→3, 8×8→4, 9×9→5
@@ -1953,13 +1957,17 @@ document.getElementById('hintBtn').onclick=()=>{
       p.ori=b.ori;p.cells=b.cells;
       if(b.onBoard&&canPlace(p.cells,b.r,b.c,p.id)) place(p,b.r,b.c);
     });
-    renderPlaced();buildTray();checkWin().catch(e=>console.error('checkWin hata (drag):',e));
+    // İpucu kaydı checkWin'den ÖNCE yapılır (son parçayı ipucu koyduysa bölüm "ipuçlu" sayılsın).
     if(target){
       hintUsed++;
+      HINTED_LEVELS.add(LEVEL);
       if(usingBonus){
         BONUS_HINTS=Math.max(0,BONUS_HINTS-1);
         localStorage_set('pz_bonushints',String(BONUS_HINTS));
       }
+    }
+    renderPlaced();buildTray();checkWin().catch(e=>console.error('checkWin hata (drag):',e));
+    if(target){
       showToast(T('hintUsedT')+' '+hintUsed+'/'+hintLimit);
       SFX.hint();
       pulseHintHighlight(target.cells,target.gridR,target.gridC);
@@ -3269,8 +3277,8 @@ const I18N={
     rulesBody:`<b>Goal:</b> Place all pieces so only the <b>target (red) cell</b> stays empty.<br><br>
 <b>Controls:</b><br>• <b>Tap</b> a piece → rotates (4 dirs + 4 mirrored)<br>• <b>Hold & drag</b> → place on board<br>• Tap a placed piece → remove it<br><br>
 <b>Levels:</b><br>• 1–25: 5×5 board<br>• 26–61: 6×6 board<br>• 62–110: 7×7 board<br>• 111–174: 8×8 board<br>• 175–255: 9×9 board<br><br>
-<b>Hints:</b> 1 on 5×5, 2 on 6×6, 3 on 7×7, 4 on 8×8, 5 on 9×9. Watch an ad to earn +1 hint!<br><br>
-<b>IQ & Titles:</b> +1 IQ per level. New title every 5 levels!`,
+<b>Hints:</b> 1 on 5×5, 2 on 6×6, 3 on 7×7, 4 on 8×8, 5 on 9×9. Solve 3 levels without using any hint to earn +1 extra hint, or watch an ad to earn +1 hint!<br><br>
+<b>IQ & Titles:</b> Your IQ grows from 85 to 160 as you advance. There are 10 titles to unlock — every new title gives +50 bonus points and +1 hint!`,
     lvl:'Level', target:'Target', targetEnd:'cell must stay empty', tap:'Tap → rotate',
     hint:'💡 Hint', reset:'↺ Reset', ad:'📺 Watch Ad & Get Hint', prevLevel:'Prev', nextLevel:'Next',
     win:'🎉 Level Complete!', next:'Next Level →', newTitle:'New Title',
@@ -3291,8 +3299,8 @@ const I18N={
     rulesBody:`<b>Amaç:</b> Tüm parçaları tahtaya yerleştir; sadece <b>hedef (kırmızı) kare</b> boş kalsın.<br><br>
 <b>Kontroller:</b><br>• Parçaya <b>dokun</b> → döner (4 yön + 4 ayna)<br>• <b>Basılı tut & sürükle</b> → tahtaya yerleştir<br>• Tahtadaki parçaya dokun → geri alır<br><br>
 <b>Bölümler:</b><br>• 1–25: 5×5 tahta<br>• 26–61: 6×6 tahta<br>• 62–110: 7×7 tahta<br>• 111–174: 8×8 tahta<br>• 175–255: 9×9 tahta<br><br>
-<b>İpucu hakkı:</b> 5×5'te 1, 6×6'da 2, 7×7'de 3, 8×8'de 4, 9×9'da 5. Reklam izle, +1 ipucu kazan!<br><br>
-<b>IQ & Ünvan:</b> Her bölüm +1 IQ. Her 5 bölümde yeni ünvan!`,
+<b>İpucu hakkı:</b> 5×5'te 1, 6×6'da 2, 7×7'de 3, 8×8'de 4, 9×9'da 5. İpucu kullanmadan 3 bölüm çöz, +1 ekstra ipucu kazan; ya da reklam izle, +1 ipucu kazan!<br><br>
+<b>IQ & Ünvan:</b> İlerledikçe IQ'n 85'ten 160'a yükselir. Açılacak 10 ünvan var — her yeni ünvan +50 bonus puan ve +1 ipucu kazandırır!`,
     lvl:'Bölüm', target:'Hedef', targetEnd:'numaralı kare boş kalsın', tap:'Dokun → döndür',
     hint:'💡 İpucu', reset:'↺ Sıfırla', ad:'📺 Reklam izle & İpucu kazan', prevLevel:'Önceki', nextLevel:'Sonraki',
     win:'🎉 Bölüm Tamamlandı!', next:'Sonraki Bölüm →', newTitle:'Yeni Ünvan',
@@ -3313,8 +3321,8 @@ const I18N={
     rulesBody:`<b>Objetivo:</b> Coloca todas las piezas; solo la <b>casilla objetivo (roja)</b> debe quedar vacía.<br><br>
 <b>Controles:</b><br>• <b>Toca</b> una pieza → gira (4 direcciones + 4 espejo)<br>• <b>Mantén y arrastra</b> → colócala en el tablero<br>• Toca una pieza colocada → la quita<br><br>
 <b>Niveles:</b><br>• 1–25: tablero 5×5<br>• 26–61: tablero 6×6<br>• 62–110: tablero 7×7<br>• 111–174: tablero 8×8<br>• 175–255: tablero 9×9<br><br>
-<b>Pistas:</b> 1 en 5×5, 2 en 6×6, 3 en 7×7, 4 en 8×8, 5 en 9×9. ¡Mira un anuncio y gana +1 pista!<br><br>
-<b>IQ y Títulos:</b> +1 IQ por nivel. ¡Nuevo título cada 5 niveles!`,
+<b>Pistas:</b> 1 en 5×5, 2 en 6×6, 3 en 7×7, 4 en 8×8, 5 en 9×9. Resuelve 3 niveles sin usar pistas y gana +1 pista extra, ¡o mira un anuncio y gana +1 pista!<br><br>
+<b>IQ y Títulos:</b> Tu IQ sube de 85 a 160 a medida que avanzas. Hay 10 títulos por desbloquear: ¡cada título nuevo da +50 puntos extra y +1 pista!`,
     lvl:'Nivel', target:'Objetivo', targetEnd:'debe quedar vacía', tap:'Toca → gira',
     hint:'💡 Pista', reset:'↺ Reiniciar', ad:'📺 Ver Anuncio y Ganar Pista', prevLevel:'Ant.', nextLevel:'Sig.',
     win:'🎉 ¡Nivel Completado!', next:'Siguiente Nivel →', newTitle:'Nuevo Título',
@@ -3335,8 +3343,8 @@ const I18N={
     rulesBody:`<b>الهدف:</b> ضع كل القطع بحيث تبقى <b>الخانة الهدف (الحمراء)</b> فقط فارغة.<br><br>
 <b>التحكم:</b><br>• <b>اضغط</b> على القطعة → تدور (4 اتجاهات + 4 معكوسة)<br>• <b>اضغط مطولاً واسحب</b> → ضعها على اللوحة<br>• اضغط على قطعة موضوعة → تُزال<br><br>
 <b>المراحل:</b><br>• 1–25: لوحة 5×5<br>• 26–61: لوحة 6×6<br>• 62–110: لوحة 7×7<br>• 111–174: لوحة 8×8<br>• 175–255: لوحة 9×9<br><br>
-<b>التلميحات:</b> 1 في 5×5، 2 في 6×6، 3 في 7×7، 4 في 8×8، 5 في 9×9. شاهد إعلانًا لتحصل على +1 تلميح!<br><br>
-<b>الذكاء والألقاب:</b> +1 ذكاء لكل مرحلة. لقب جديد كل 5 مراحل!`,
+<b>التلميحات:</b> 1 في 5×5، 2 في 6×6، 3 في 7×7، 4 في 8×8، 5 في 9×9. حلّ 3 مراحل دون استخدام أي تلميح لتحصل على +1 تلميح إضافي، أو شاهد إعلانًا لتحصل على +1 تلميح!<br><br>
+<b>الذكاء والألقاب:</b> يرتفع ذكاؤك من 85 إلى 160 كلما تقدمت. هناك 10 ألقاب لتفتحها — كل لقب جديد يمنحك +50 نقطة إضافية و+1 تلميح!`,
     lvl:'المرحلة', target:'الهدف', targetEnd:'يجب أن تبقى فارغة', tap:'اضغط → تدوير',
     hint:'💡 تلميح', reset:'↺ إعادة', ad:'📺 شاهد إعلانًا واحصل على تلميح', prevLevel:'السابق', nextLevel:'التالي',
     win:'🎉 اكتملت المرحلة!', next:'المرحلة التالية ←', newTitle:'لقب جديد',
@@ -3357,8 +3365,8 @@ const I18N={
     rulesBody:`<b>Цель:</b> Разместите все фигуры так, чтобы пустой осталась только <b>целевая (красная) клетка</b>.<br><br>
 <b>Управление:</b><br>• <b>Нажмите</b> на фигуру → поворот (4 стороны + 4 зеркальные)<br>• <b>Удерживайте и тяните</b> → поставить на доску<br>• Нажмите на размещённую фигуру → убрать<br><br>
 <b>Уровни:</b><br>• 1–25: доска 5×5<br>• 26–61: доска 6×6<br>• 62–110: доска 7×7<br>• 111–174: доска 8×8<br>• 175–255: доска 9×9<br><br>
-<b>Подсказки:</b> 1 на 5×5, 2 на 6×6, 3 на 7×7, 4 на 8×8, 5 на 9×9. Посмотри рекламу — получи +1 подсказку!<br><br>
-<b>IQ и Титулы:</b> +1 IQ за уровень. Новый титул каждые 5 уровней!`,
+<b>Подсказки:</b> 1 на 5×5, 2 на 6×6, 3 на 7×7, 4 на 8×8, 5 на 9×9. Реши 3 уровня без подсказок — получи +1 дополнительную подсказку, или посмотри рекламу — получи +1 подсказку!<br><br>
+<b>IQ и Титулы:</b> По мере прохождения твой IQ растёт с 85 до 160. Нужно открыть 10 титулов — каждый новый титул даёт +50 бонусных очков и +1 подсказку!`,
     lvl:'Уровень', target:'Цель', targetEnd:'клетка должна остаться пустой', tap:'Нажми → поворот',
     hint:'💡 Подсказка', reset:'↺ Сброс', ad:'📺 Реклама и подсказка', prevLevel:'Пред.', nextLevel:'След.',
     win:'🎉 Уровень пройден!', next:'Следующий уровень →', newTitle:'Новый титул',
