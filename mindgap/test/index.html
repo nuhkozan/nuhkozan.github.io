@@ -1188,7 +1188,7 @@ function doRotate(p){
   buildTray();
   checkWin().catch(e=>console.error('checkWin hata (rotate):',e));
   const isFlip=p.ori>=4;
-  showToast(isFlip?'⇋ Ayna + '+(p.ori%4)*90+'°':'↻ '+(p.ori%4)*90+'° döndü');
+  showToast(isFlip?'⇋ '+(p.ori%4)*90+'°':'↻ '+(p.ori%4)*90+'°'); // simge + derece: her dilde aynı, çeviri gerekmez
   SFX.rotate(); HAPTICS.rotate();
   if(typeof LEVEL1_GUIDE_ACTIVE!=='undefined' && LEVEL1_GUIDE_ACTIVE
      && LEVEL1_GUIDE_PIECE_ID===p.id && LEVEL1_GUIDE_PHASE==='rotate'){
@@ -1962,6 +1962,7 @@ function updateHintCount(){
     const n=hintRemaining();
     el.textContent=String(n);
     el.classList.toggle('zero',n<=0);
+    if(n<=0) maybePrepareAd(); // ipucu bitti: oyuncu yakında reklam isteyecek, şimdiden hazırla
   }catch(e){}
 }
 // Ekstra ipucu kazanıldı: düğme zıplar, "+1 💡" yukarı süzülür, ses + titreşim.
@@ -2074,7 +2075,20 @@ function endAdSession(){
   clearTimeout(adTimeoutTimer); adTimeoutTimer=null;
   const badge=document.getElementById('adCountdownBadge');
   if(badge) badge.style.display='none';
+  const sb=document.getElementById('solveBtn'); if(sb) sb.disabled=false; // oturum bitti, buton yeniden açık
 }
+
+// Reklam ihtiyacı yakınsa (ipucu hakkı 0) native tarafa arka planda yüklemesini söyler.
+// Native tek yükleme + üstel bekleme kurallarını uygular; tekrarlı çağrı güvenlidir.
+function maybePrepareAd(){
+  try{
+    if(typeof window.AndroidBridge!=='undefined' && window.AndroidBridge
+       && typeof window.AndroidBridge.prepareRewardedAd==='function'){
+      window.AndroidBridge.prepareRewardedAd();
+    }
+  }catch(e){}
+}
+window.onAdsSdkInitialized=function(){ try{ if(hintRemaining()<=0) maybePrepareAd(); }catch(e){} };
 
 // Reklam GERÇEKTEN izlenip ödül kazanıldığında çağrılır: kalıcı ipucu havuzuna
 // (BONUS_HINTS) +1 ekler. Bölümü çözmez — oyuncu bölümü kendisi çözer, ilerleme/puan/IQ
@@ -2103,6 +2117,15 @@ document.getElementById('solveBtn').onclick=()=>{
     adSessionActive=true;
     adAlreadyHandled=false;
     adInProgress=true;
+
+    // Oturum boyunca buton pasif (çift basış / ikinci istek olmasın); endAdSession açar.
+    document.getElementById('solveBtn').disabled=true;
+    // Reklam hazır değilse kullanıcıya hemen kısa bir bilgi ver (sessiz beklemesin).
+    try{
+      if(typeof window.AndroidBridge.isRewardedAdReady==='function' && !window.AndroidBridge.isRewardedAdReady()){
+        showToast(T('adLoading'),2500);
+      }
+    }catch(e){}
 
     let secondsLeft=10;
     const badge=document.getElementById('adCountdownBadge');
@@ -2213,10 +2236,12 @@ window.onRewardedAdClosedWithoutReward=function(){
   showToast(T('adClosedNoReward'),3000);
 };
 window.onRewardedAdFailed=function(msg){
+  // Native "reklam gösterilemedi" dedi. Ödül verilmez (ödül yalnızca onRewardEarned ile gelir).
+  // Oturumu hemen kapat, butonu aç ve kısa bir mesaj göster.
   if(msg) lastAdDebugMsg=msg;
-  if(!adSessionActive){ adInProgress=false; showToast(T('adFailed')+(msg?' ('+msg+')':'')); }
-  // adSessionActive true ise: 10 saniyelik deneme döngüsü zaten devam ediyor,
-  // her başarısız denemede ayrı bir uyarı göstermiyoruz.
+  adAlreadyHandled=true;
+  endAdSession();
+  showToast(T('adFailed'),3000);
 };
 window.onRewardedAdNotReady=function(msg){
   if(msg) lastAdDebugMsg=msg;
@@ -3477,6 +3502,7 @@ function applyLang(){
   document.getElementById('mapCloseBtn').textContent=T('close');
   document.getElementById('hintLbl').textContent=T('hint');
   updateHintCount();
+  try{ if(typeof USERNAME!=='undefined' && USERNAME) updateUserTag(); }catch(e){} // unvan yeni dilde görünsün
   document.getElementById('resetBtn').textContent=T('reset');
   document.getElementById('prevBtnTxt').textContent=T('prevLevel');
   document.getElementById('nextBtnTxt').textContent=T('nextLevel');
@@ -3494,7 +3520,7 @@ function refreshLevelTexts(){
   if(typeof demoActive!=='undefined' && demoActive) return; // demo modunda üzerine yazma
   if(typeof tutorialInteractive!=='undefined' && tutorialInteractive) return; // interaktif Bölüm 0'da üzerine yazma
   lvlBadge.textContent=`🎯 ${LEVEL+1}/${TOTAL_LEVELS}`;
-  subTxt.innerHTML=`${GRID}×${GRID} | ${T('target')}: <b style="color:#e04040">${CELL_NUM}</b> ${T('targetEnd')} | ${T('tap')}`;
+  subTxt.innerHTML=`<span>${GRID}×${GRID} | ${T('target')}: <b style="color:#e04040">${CELL_NUM}</b> ${T('targetEnd')} | ${T('tap')}</span>`; // tek span: .sub flex olduğu için boşluklar korunur
 }
 
 // Menü butonları
