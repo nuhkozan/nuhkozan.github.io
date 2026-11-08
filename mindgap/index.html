@@ -2147,7 +2147,7 @@ document.getElementById('solveBtn').onclick=()=>{
       if(adAlreadyHandled) return;
       adAlreadyHandled=true;
       endAdSession();
-      showToast(T('adTimeoutFallback')+(lastAdDebugMsg?' — '+lastAdDebugMsg:''),4000);
+      showToast(T('adTimeoutFallback')+((window.MG_TEST_MODE&&lastAdDebugMsg)?' — '+lastAdDebugMsg:''),4000); // teknik ayrıntı yalnız test modunda
     }, 10000);
 
     return;
@@ -2244,8 +2244,10 @@ window.onRewardedAdFailed=function(msg){
   showToast(T('adFailed'),3000);
 };
 window.onRewardedAdNotReady=function(msg){
+  // Native "reklam henüz hazır değil" dedi. Oturum sürerken sessizce beklenir (deneme döngüsü
+  // 10 sn'ye kadar tekrar sorar). Oturum bittiyse bu GEÇ gelen bir yanıttır: zaman aşımı
+  // mesajının üzerine yazmasın diye hiçbir şey gösterilmez.
   if(msg) lastAdDebugMsg=msg;
-  if(!adSessionActive){ adInProgress=false; showToast(T('adNotReady')+(msg?' ('+msg+')':'')); }
 };
 
 document.getElementById('adCloseBtn').onclick=()=>{
