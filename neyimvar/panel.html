@@ -93,7 +93,8 @@ th{color:var(--mu);font-weight:600}
   <div id="kinds"></div>
 
   <h2>Üyelerin ülkesi</h2>
-  <div class="rows" id="cty"></div>
+  <p class="note" style="margin-top:0">Son 14 günde en az 1 sorgu yapan üyeler.</p>
+  <div id="cty"></div>
 
   <p class="note" id="foot"></p>
 </main>
@@ -166,7 +167,14 @@ th{color:var(--mu);font-weight:600}
     bars($("d-u"), d.daily, function(r){ return dayLabel(r.day); }, function(r){ return r.signups; });
     bars($("ver"), d.versions, function(r){ return r.version; }, function(r){ return r.users; }, function(r){ return nf.format(r.users) + " · %" + String(r.pct).replace(".",","); });
     table($("kinds"), ["Tür","Sorgu","Maliyet","Sorgu başı"], d.kinds.map(function(r){ return [r.kind, nf.format(r.queries), usd(r.cost,2), usd(r.queries ? r.cost/r.queries : 0, 3)]; }));
-    bars($("cty"), d.countries, function(r){ return r.country; }, function(r){ return r.users; });
+    var c = d.countries14d;
+    if(c){
+      var rows = (c.top || []).map(function(r){ return [r.country, nf.format(r.members), nf.format(r.queries)]; });
+      if(c.other) rows.push(["Diğer (" + nf.format(c.other.countries) + " ülke)", nf.format(c.other.members), nf.format(c.other.queries)]);
+      table($("cty"), ["Ülke","Sorgu yapan üye","Sorgu"], rows);
+    }else{
+      bars($("cty"), d.countries || [], function(r){ return r.country; }, function(r){ return r.users; });
+    }
 
     put("upd","Güncellendi: " + new Date(d.generatedAt).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"}));
     put("foot","Maliyet: " + (d.costNote || "tahmin") + ". Gerçek harcama için Anthropic konsoluna, reklam geliri için AdMob'a bakın. Günler UTC'ye göre sayılır.");
