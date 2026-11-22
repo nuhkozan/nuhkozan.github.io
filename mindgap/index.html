@@ -3527,6 +3527,7 @@ function applyLang(){
   document.getElementById('titleUpLabelTxt').textContent=T('newTitle');
   document.querySelector('#lbModal h2').textContent=T('lbTitle');
   document.getElementById('langSel').value=LANG;
+  try{ if(window.AndroidBridge && typeof AndroidBridge.setAppLanguage==='function') AndroidBridge.setAppLanguage(LANG); }catch(e){} // bildirim dili (yeni APK)
   if(typeof LEVEL!=='undefined') refreshLevelTexts();
 }
 
