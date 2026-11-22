@@ -195,6 +195,8 @@ button:disabled{opacity:.35;cursor:default}
 #adCloseBtn{display:none}
 #adCloseBtn.show{display:inline-block}
 
+#mmFooter{margin-top:6px;text-align:center;color:rgba(160,190,210,.55);font-size:.8rem;line-height:1.5;letter-spacing:.03em}
+#mmFooter #mmVer:empty{display:none}
 /* ANA MENÜ */
 #mainMenu{position:fixed;inset:0;z-index:10008;display:none;
   flex-direction:column;align-items:center;justify-content:center;gap:14px;
@@ -518,7 +520,9 @@ function logAnalyticsEvent(name, params){
   <div id="menuToggleRow">
     <button id="soundToggleBtn" class="toggleBtn">🔊</button>
     <button id="hapticToggleBtn" class="toggleBtn">📳</button>
+    <button id="notifToggleBtn" class="toggleBtn" style="display:none">🔔</button>
   </div>
+  <div id="mmFooter"><div id="mmVer"></div><div>@KozanGames</div></div>
 </div>
 
 <div class="modal" id="rulesModal">
@@ -680,6 +684,27 @@ function toggleHaptic(){
   localStorage_set('pz_haptic', HAPTIC_ON?'1':'0');
   updateHapticToggleUI();
   if(HAPTIC_ON) haptic(15);
+}
+// Günlük hatırlatma bildirimi aç/kapa (yalnızca bunu destekleyen yeni APK'da görünür).
+let NOTIF_ON=localStorage_get('pz_notif_on')!=='0';
+function notifBridgeOk(){
+  return !!(window.AndroidBridge && typeof AndroidBridge.setReminderEnabled==='function');
+}
+function updateNotifToggleUI(){
+  const btn=document.getElementById('notifToggleBtn');
+  if(!btn) return;
+  btn.style.display = notifBridgeOk() ? 'flex' : 'none';
+  btn.textContent = NOTIF_ON ? '🔔' : '🔕';
+}
+function toggleNotif(){
+  NOTIF_ON=!NOTIF_ON;
+  localStorage_set('pz_notif_on', NOTIF_ON?'1':'0');
+  updateNotifToggleUI();
+  try{
+    if(notifBridgeOk()) AndroidBridge.setReminderEnabled(NOTIF_ON);
+    if(NOTIF_ON && typeof AndroidBridge.requestNotificationPermission==='function') AndroidBridge.requestNotificationPermission();
+  }catch(e){}
+  if(NOTIF_ON) SFX.click();
 }
 function updateSoundToggleUI(){
   const btn=document.getElementById('soundToggleBtn');
@@ -1372,6 +1397,15 @@ function onBoardDown(e){
 // ═══════════════════════════════════════════════════════
 // KAZANMA
 // ═══════════════════════════════════════════════════════
+// İlk bölüm çözüldükten sonra (yalnızca yeni APK'da) bildirim iznini bir kez ister.
+function maybeAskNotifPermission(){
+  try{
+    if(!(window.AndroidBridge && typeof AndroidBridge.requestNotificationPermission==='function')) return;
+    if(localStorage_get('pz_notif_asked')) return;
+    localStorage_set('pz_notif_asked','1');
+    setTimeout(function(){ try{ AndroidBridge.requestNotificationPermission(); }catch(e){} },2500);
+  }catch(e){}
+}
 async function checkWin(){
   const all=Object.values(pieces);
   const placed=all.filter(p=>p.onBoard).length;
@@ -1409,7 +1443,7 @@ async function checkWin(){
   });
   // Puan/IQ/ünvan ilerlemesi sadece bölümün ilk çözümünde verilir.
   const countsForProgress = isFirstTime;
-  if(isFirstTime){ registerStreakProgress(); } // günlük seri
+  if(isFirstTime){ registerStreakProgress(); maybeAskNotifPermission(); } // günlük seri + bildirim izni (bir kez)
   if(LEVEL+1>MAX_LEVEL){
     MAX_LEVEL=LEVEL+1;
     localStorage_set('pz_maxlevel',String(MAX_LEVEL));
@@ -2147,7 +2181,7 @@ document.getElementById('solveBtn').onclick=()=>{
       if(adAlreadyHandled) return;
       adAlreadyHandled=true;
       endAdSession();
-      showToast(T('adTimeoutFallback')+(lastAdDebugMsg?' — '+lastAdDebugMsg:''),4000);
+      showToast(T('adTimeoutFallback')+((window.MG_TEST_MODE&&lastAdDebugMsg)?' — '+lastAdDebugMsg:''),4000); // teknik ayrıntı yalnız test modunda
     }, 10000);
 
     return;
@@ -2244,8 +2278,10 @@ window.onRewardedAdFailed=function(msg){
   showToast(T('adFailed'),3000);
 };
 window.onRewardedAdNotReady=function(msg){
+  // Native "reklam henüz hazır değil" dedi. Oturum sürerken sessizce beklenir (deneme döngüsü
+  // 10 sn'ye kadar tekrar sorar). Oturum bittiyse bu GEÇ gelen bir yanıttır: zaman aşımı
+  // mesajının üzerine yazmasın diye hiçbir şey gösterilmez.
   if(msg) lastAdDebugMsg=msg;
-  if(!adSessionActive){ adInProgress=false; showToast(T('adNotReady')+(msg?' ('+msg+')':'')); }
 };
 
 document.getElementById('adCloseBtn').onclick=()=>{
@@ -2928,9 +2964,9 @@ async function saveScore(){
     // kaydediyoruz. Böylece Şampiyonlar Ligi'ni görüntüleyen her kullanıcı,
     // ünvanı KENDİ dilinde hesaplayıp gösterir — kaydedenin dilinde donmuş
     // bir metin kalmaz (önceki "TR/EN karışık ünvan" hatasının kök nedeni buydu).
-    const data=JSON.stringify({name:USERNAME,iq,score:SCORE,level:LEVEL,earnedLevel:EARNED_LEVEL,title:titleFor(EARNED_LEVEL),t:Date.now()});
-    await sSet('score:'+nameKey(USERNAME),data,true);
-    // v2: yeni, sıralanabilir 'scores' koleksiyonuna da yaz (ayrı try — biri hata verirse diğeri etkilenmez)
+    // 22 Kasım 2026: eski 'shared_kv' içindeki 'score:*' çift yazımı KALDIRILDI.
+    // Skor yalnızca 'scores' koleksiyonuna yazılır. ('user:*' kayıtları shared_kv'de
+    // kalır — kullanıcı adı benzersizliği için registerUser hâlâ onları kullanıyor.)
     try{
       await db.collection('scores').doc(nameKey(USERNAME)).set({
         name:USERNAME, iq:Number(iq)||0, score:Math.floor(SCORE)||0,
@@ -3513,6 +3549,7 @@ function applyLang(){
   document.getElementById('titleUpLabelTxt').textContent=T('newTitle');
   document.querySelector('#lbModal h2').textContent=T('lbTitle');
   document.getElementById('langSel').value=LANG;
+  try{ if(window.AndroidBridge && typeof AndroidBridge.setAppLanguage==='function') AndroidBridge.setAppLanguage(LANG); }catch(e){} // bildirim dili (yeni APK)
   if(typeof LEVEL!=='undefined') refreshLevelTexts();
 }
 
@@ -3576,6 +3613,9 @@ document.getElementById('mmChamp').onclick=()=>{ showLeaderboard(); };
 document.getElementById('mmLevelMap').onclick=()=>{ showLevelMap(); };
 document.getElementById('soundToggleBtn').onclick=toggleSound;
 document.getElementById('hapticToggleBtn').onclick=toggleHaptic;
+document.getElementById('notifToggleBtn').onclick=toggleNotif;
+try{ if(notifBridgeOk()) AndroidBridge.setReminderEnabled(NOTIF_ON); }catch(e){}
+updateNotifToggleUI();
 document.getElementById('mmRules').onclick=()=>{
   document.getElementById('rulesModal').classList.add('show');
 };
@@ -3599,6 +3639,25 @@ document.getElementById('homeBtn').onclick=()=>{
   refreshMenuButtons();
 };
 
+// Telefonun geri tuşu (yeni APK'da native taraf çağırır). true = tuş burada işlendi.
+//  Reklam/kazanma ekranı/zorunlu pencereler: yok sayılır · diğer pencereler: kapanır ·
+//  bölüm ekranı: ana menüye döner · ana menü: false (uygulama arka plana alınır).
+window.onNativeBack=function(){
+  try{
+    const $=id=>document.getElementById(id);
+    const shown=id=>{const e=$(id);return !!(e && e.classList.contains('show'));};
+    if(adInProgress || adSessionActive || shown('adOverlay')) return true;
+    if(shown('langPickModal') || shown('nameModal')) return true;
+    if(shown('winOverlay')) return true;
+    if(shown('rateModal')){ $('rateLaterBtn').click(); return true; }
+    if(shown('rulesModal')){ $('rulesCloseBtn').click(); return true; }
+    if(shown('lbModal')){ $('lbCloseBtn').click(); return true; }
+    if(shown('mapModal')){ $('mapCloseBtn').click(); return true; }
+    if(shown('mainMenu')) return false;
+    $('homeBtn').click();
+    return true;
+  }catch(e){ return false; }
+};
 window.addEventListener('resize',()=>{setupLayout();drawGrid();renderPlaced();buildTray();});
 loadLevel();
 applyLang();
@@ -3714,6 +3773,17 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('SW kayıt hatası:',e));
   });
 }
+</script>
+<script>
+/* Ana menü alt yazısı: uygulama sürümü (yalnızca yeni APK'da; eski APK/tarayıcıda gizli kalır) */
+(function(){
+  try{
+    if(window.AndroidBridge && typeof AndroidBridge.getAppVersion==='function'){
+      var v=AndroidBridge.getAppVersion();
+      if(v){ document.getElementById('mmVer').textContent=v; }
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
