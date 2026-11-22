@@ -1375,6 +1375,15 @@ function onBoardDown(e){
 // ═══════════════════════════════════════════════════════
 // KAZANMA
 // ═══════════════════════════════════════════════════════
+// İlk bölüm çözüldükten sonra (yalnızca yeni APK'da) bildirim iznini bir kez ister.
+function maybeAskNotifPermission(){
+  try{
+    if(!(window.AndroidBridge && typeof AndroidBridge.requestNotificationPermission==='function')) return;
+    if(localStorage_get('pz_notif_asked')) return;
+    localStorage_set('pz_notif_asked','1');
+    setTimeout(function(){ try{ AndroidBridge.requestNotificationPermission(); }catch(e){} },2500);
+  }catch(e){}
+}
 async function checkWin(){
   const all=Object.values(pieces);
   const placed=all.filter(p=>p.onBoard).length;
@@ -1412,7 +1421,7 @@ async function checkWin(){
   });
   // Puan/IQ/ünvan ilerlemesi sadece bölümün ilk çözümünde verilir.
   const countsForProgress = isFirstTime;
-  if(isFirstTime){ registerStreakProgress(); } // günlük seri
+  if(isFirstTime){ registerStreakProgress(); maybeAskNotifPermission(); } // günlük seri + bildirim izni (bir kez)
   if(LEVEL+1>MAX_LEVEL){
     MAX_LEVEL=LEVEL+1;
     localStorage_set('pz_maxlevel',String(MAX_LEVEL));
