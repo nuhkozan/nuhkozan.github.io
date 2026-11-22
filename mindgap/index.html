@@ -520,6 +520,7 @@ function logAnalyticsEvent(name, params){
   <div id="menuToggleRow">
     <button id="soundToggleBtn" class="toggleBtn">🔊</button>
     <button id="hapticToggleBtn" class="toggleBtn">📳</button>
+    <button id="notifToggleBtn" class="toggleBtn" style="display:none">🔔</button>
   </div>
   <div id="mmFooter"><div id="mmVer"></div><div>@KozanGames</div></div>
 </div>
@@ -683,6 +684,27 @@ function toggleHaptic(){
   localStorage_set('pz_haptic', HAPTIC_ON?'1':'0');
   updateHapticToggleUI();
   if(HAPTIC_ON) haptic(15);
+}
+// Günlük hatırlatma bildirimi aç/kapa (yalnızca bunu destekleyen yeni APK'da görünür).
+let NOTIF_ON=localStorage_get('pz_notif_on')!=='0';
+function notifBridgeOk(){
+  return !!(window.AndroidBridge && typeof AndroidBridge.setReminderEnabled==='function');
+}
+function updateNotifToggleUI(){
+  const btn=document.getElementById('notifToggleBtn');
+  if(!btn) return;
+  btn.style.display = notifBridgeOk() ? 'flex' : 'none';
+  btn.textContent = NOTIF_ON ? '🔔' : '🔕';
+}
+function toggleNotif(){
+  NOTIF_ON=!NOTIF_ON;
+  localStorage_set('pz_notif_on', NOTIF_ON?'1':'0');
+  updateNotifToggleUI();
+  try{
+    if(notifBridgeOk()) AndroidBridge.setReminderEnabled(NOTIF_ON);
+    if(NOTIF_ON && typeof AndroidBridge.requestNotificationPermission==='function') AndroidBridge.requestNotificationPermission();
+  }catch(e){}
+  if(NOTIF_ON) SFX.click();
 }
 function updateSoundToggleUI(){
   const btn=document.getElementById('soundToggleBtn');
@@ -3591,6 +3613,9 @@ document.getElementById('mmChamp').onclick=()=>{ showLeaderboard(); };
 document.getElementById('mmLevelMap').onclick=()=>{ showLevelMap(); };
 document.getElementById('soundToggleBtn').onclick=toggleSound;
 document.getElementById('hapticToggleBtn').onclick=toggleHaptic;
+document.getElementById('notifToggleBtn').onclick=toggleNotif;
+try{ if(notifBridgeOk()) AndroidBridge.setReminderEnabled(NOTIF_ON); }catch(e){}
+updateNotifToggleUI();
 document.getElementById('mmRules').onclick=()=>{
   document.getElementById('rulesModal').classList.add('show');
 };
@@ -3614,6 +3639,25 @@ document.getElementById('homeBtn').onclick=()=>{
   refreshMenuButtons();
 };
 
+// Telefonun geri tuşu (yeni APK'da native taraf çağırır). true = tuş burada işlendi.
+//  Reklam/kazanma ekranı/zorunlu pencereler: yok sayılır · diğer pencereler: kapanır ·
+//  bölüm ekranı: ana menüye döner · ana menü: false (uygulama arka plana alınır).
+window.onNativeBack=function(){
+  try{
+    const $=id=>document.getElementById(id);
+    const shown=id=>{const e=$(id);return !!(e && e.classList.contains('show'));};
+    if(adInProgress || adSessionActive || shown('adOverlay')) return true;
+    if(shown('langPickModal') || shown('nameModal')) return true;
+    if(shown('winOverlay')) return true;
+    if(shown('rateModal')){ $('rateLaterBtn').click(); return true; }
+    if(shown('rulesModal')){ $('rulesCloseBtn').click(); return true; }
+    if(shown('lbModal')){ $('lbCloseBtn').click(); return true; }
+    if(shown('mapModal')){ $('mapCloseBtn').click(); return true; }
+    if(shown('mainMenu')) return false;
+    $('homeBtn').click();
+    return true;
+  }catch(e){ return false; }
+};
 window.addEventListener('resize',()=>{setupLayout();drawGrid();renderPlaced();buildTray();});
 loadLevel();
 applyLang();
