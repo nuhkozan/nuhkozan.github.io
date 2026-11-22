@@ -2964,9 +2964,9 @@ async function saveScore(){
     // kaydediyoruz. Böylece Şampiyonlar Ligi'ni görüntüleyen her kullanıcı,
     // ünvanı KENDİ dilinde hesaplayıp gösterir — kaydedenin dilinde donmuş
     // bir metin kalmaz (önceki "TR/EN karışık ünvan" hatasının kök nedeni buydu).
-    const data=JSON.stringify({name:USERNAME,iq,score:SCORE,level:LEVEL,earnedLevel:EARNED_LEVEL,title:titleFor(EARNED_LEVEL),t:Date.now()});
-    await sSet('score:'+nameKey(USERNAME),data,true);
-    // v2: yeni, sıralanabilir 'scores' koleksiyonuna da yaz (ayrı try — biri hata verirse diğeri etkilenmez)
+    // 22 Kasım 2026: eski 'shared_kv' içindeki 'score:*' çift yazımı KALDIRILDI.
+    // Skor yalnızca 'scores' koleksiyonuna yazılır. ('user:*' kayıtları shared_kv'de
+    // kalır — kullanıcı adı benzersizliği için registerUser hâlâ onları kullanıyor.)
     try{
       await db.collection('scores').doc(nameKey(USERNAME)).set({
         name:USERNAME, iq:Number(iq)||0, score:Math.floor(SCORE)||0,
