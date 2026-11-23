@@ -430,12 +430,22 @@ const db = firebase.firestore();
 // koşullarında (ör. ölçüm isteği engellenmişse) analytics.() çağrısı
 // hata verebilir; bu durum oyunun geri kalanını ASLA etkilememeli.
 let ANALYTICS=null;
-try{ ANALYTICS=firebase.analytics(); }catch(e){ console.error('Analytics başlatılamadı:',e); }
+// Yeni APK'da (AndroidBridge.logEvent var) olaylar NATIVE Firebase Analytics'e gider
+// (UMP rızasına bağlı); web SDK hiç başlatılmaz → çift sayım ve rızasız web verisi olmaz.
+// Eski APK / tarayıcıda web SDK eskisi gibi çalışır.
+const NATIVE_ANALYTICS=!!(window.AndroidBridge && typeof window.AndroidBridge.logEvent==='function');
+if(!NATIVE_ANALYTICS){
+  try{ ANALYTICS=firebase.analytics(); }catch(e){ console.error('Analytics başlatılamadı:',e); }
+}
 
 // Tüm özel olay kayıtları bu fonksiyon üzerinden geçer — Analytics
 // kullanılamıyorsa (ANALYTICS=null) sessizce hiçbir şey yapmaz, oyunun
 // akışını asla bloklamaz veya hataya düşürmez.
 function logAnalyticsEvent(name, params){
+  if(NATIVE_ANALYTICS){
+    try{ window.AndroidBridge.logEvent(name, JSON.stringify(params||{})); }catch(e){}
+    return;
+  }
   if(!ANALYTICS) return;
   try{ ANALYTICS.logEvent(name, params||{}); }catch(e){}
 }
